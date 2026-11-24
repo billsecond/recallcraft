@@ -1,0 +1,15 @@
+[package]
+name = "recallcraft-model"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+description = "RecallCraft's plain data: settings, calls, transcript lines and who said them"
+
+[lints]
+workspace = true
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+jiff = { workspace = true }

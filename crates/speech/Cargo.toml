@@ -1,0 +1,25 @@
+[package]
+name = "recallcraft-speech"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+description = "Hearing what was said, on this computer: Whisper run on the processor by candle, the sound cut into what each person said, echoes left out, voices told apart"
+
+[lints]
+workspace = true
+
+[dependencies]
+# The tensor library written in Rust (no C++, no GPU here): its 8-bit matrix kernels run the
+# decoder, its float ones the encoder.
+candle-core = { workspace = true }
+candle-nn = { workspace = true }
+rustfft = { workspace = true }
+# Aligned copies of the model's weights (candle reads them in place).
+bytemuck = { workspace = true }
+log = { workspace = true }
+thiserror = { workspace = true }
+serde = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }

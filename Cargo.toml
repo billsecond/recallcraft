@@ -1,0 +1,81 @@
+[workspace]
+resolver = "3"
+members = ["crates/*", "apps/*", "xtask"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "MIT OR Apache-2.0"
+rust-version = "1.91"
+repository = "https://github.com/billsecond/recallcraft"
+
+[workspace.dependencies]
+# internal
+recallcraft-model = { path = "crates/model" }
+recallcraft-store = { path = "crates/store" }
+recallcraft-speech = { path = "crates/speech" }
+recallcraft-audio = { path = "crates/audio" }
+recallcraft-calls = { path = "crates/calls" }
+recallcraft-engine = { path = "crates/engine" }
+recallcraft-desktop = { path = "crates/desktop" }
+
+# foundation
+thiserror = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+log = "0.4"
+getrandom = "0.3"
+# Local time for the call list and file names (the system's time zone; the zone database is
+# bundled where the system has none, Windows).
+jiff = "0.2.38"
+dirs = "7"
+
+# Sound kept compactly: Opus (RFC 6716), encoder and decoder written in Rust.
+rusty-opus = "1.0.2"
+
+# Speech to text, on this computer (Whisper on the processor): the tensor library written in Rust,
+# its FFT, and casts for aligned copies.
+candle-core = { version = "0.11.1", default-features = false }
+candle-nn = { version = "0.11.1", default-features = false }
+rustfft = "6.4.1"
+bytemuck = "1.25"
+
+# Sound devices: WASAPI on Windows (the microphone, and what the computer plays through a
+# loopback that leaves RecallCraft's own sound out), cpal elsewhere and for playback.
+wasapi = "0.27"
+cpal = "0.18.2"
+windows = { version = "0.62", default-features = false }
+winsafe = { version = "0.0.29" }
+winreg = "0.56"
+
+# ui
+egui = "0.36"
+egui_extras = { version = "0.36", default-features = false }
+eframe = { version = "0.36", default-features = false }
+rfd = "0.17"
+# The tray; on Linux and the BSDs through ksni (StatusNotifierItem over D-Bus, in Rust).
+tray-icon = { version = "0.26.1", default-features = false, features = ["ksni"] }
+global-hotkey = "0.8.0"
+winit = { version = "0.30", default-features = false, features = ["rwh_06"] }
+opener = { version = "0.9", default-features = false, features = ["reveal"] }
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
+[workspace.lints.clippy]
+dbg_macro = "warn"
+todo = "warn"
+too_many_arguments = "allow"
+type_complexity = "allow"
+
+[profile.dev.package."*"]
+opt-level = 2
+
+[profile.dev]
+opt-level = 1
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 16
+debug = 0
