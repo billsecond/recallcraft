@@ -3565,7 +3565,6 @@ dependencies = [
 name = "recallcraft-calls"
 version = "0.1.0"
 dependencies = [
- "log",
  "wasapi",
  "winsafe",
 ]
