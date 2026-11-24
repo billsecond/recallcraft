@@ -692,7 +692,9 @@ do {{
 $tmp = Join-Path ([IO.Path]::GetTempPath()) ('recallcraft-update-' + [guid]::NewGuid())
 try {{
   if ($left.Count -gt 0) {{ throw 'RecallCraft is still running' }}
-  Expand-Archive -LiteralPath $zip -DestinationPath $tmp -Force
+  # .NET's own unzip: the Archive module's breaks when a PowerShell 7's modules are on the path.
+  Add-Type -AssemblyName System.IO.Compression.FileSystem
+  [IO.Compression.ZipFile]::ExtractToDirectory($zip, $tmp)
   $src = Get-ChildItem -LiteralPath $tmp -Directory | Where-Object {{ Test-Path -LiteralPath (Join-Path $_.FullName 'recallcraft.exe') }} | Select-Object -First 1
   if (-not $src) {{ throw 'the zip has no RecallCraft in it' }}
   Get-ChildItem -LiteralPath $src.FullName | Copy-Item -Destination $dir -Recurse -Force
@@ -772,11 +774,14 @@ mod windows {
         root.unwrap_or_else(|| PathBuf::from(r"C:\Windows")).join("System32")
     }
 
-    /// Starts a helper with `args`, detached and windowless, out of this program's job.
+    /// Starts a helper with `args`, detached and windowless, out of this program's job. Windows
+    /// PowerShell finds its own modules: a PowerShell 7's, on the module path RecallCraft
+    /// inherited when it was started from a PowerShell 7 terminal, break it.
     fn spawn_detached(program: &Path, args: &str, dir: &Path) -> std::io::Result<std::process::Child> {
         let spawn = |flags: u32| {
             Command::new(program)
                 .raw_arg(args)
+                .env_remove("PSModulePath")
                 .creation_flags(flags)
                 .current_dir(dir)
                 .stdin(Stdio::null())
@@ -1258,7 +1263,8 @@ mod tests {
         )
         .unwrap();
         assert!(script.contains("$dir = 'D:\\Tools\\RecallCraft'\n"), "{script}");
-        assert!(script.contains("Expand-Archive -LiteralPath $zip"));
+        assert!(script.contains("ZipFile]::ExtractToDirectory($zip, $tmp)"));
+        assert!(!script.contains("Expand-Archive"), "it breaks under a PowerShell 7's module path");
         assert!(script.contains("'--background'"), "started again either way");
         assert!(portable_script("a\u{0}b", r"D:\x", "l", true).is_err());
 
