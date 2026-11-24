@@ -207,6 +207,8 @@ pub struct Settings {
     pub export: ExportSettings,
     /// Playback speed in the window.
     pub playback_speed: f32,
+    /// Ask GitHub for a newer RecallCraft now and then (the only thing that goes to the network).
+    pub check_updates: bool,
 }
 
 impl Default for Settings {
@@ -236,6 +238,7 @@ impl Default for Settings {
             tray_dot: true,
             export: ExportSettings::default(),
             playback_speed: 1.0,
+            check_updates: true,
         }
     }
 }

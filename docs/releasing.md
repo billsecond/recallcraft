@@ -68,6 +68,44 @@ Dry run: `gh workflow run release.yml --ref <branch>` builds everything on any b
 the files as workflow artifacts without publishing anything (FreeBSD only when asked for: it is
 slow).
 
+## Automatic updates
+
+The service checks `GET /repos/billsecond/recallcraft/releases/latest` a minute after it starts
+and every six hours (never during a call; "Check for updates automatically" in Settings › Updates
+turns it off; `crates/desktop/src/update.rs`). It relies on what the workflow above produces, so
+keep it so:
+
+- The tag is `v<version>` and the version is semver. Drafts and pre-releases are never offered
+  (GitHub's "latest" skips them anyway).
+- The Windows MSIs are named `recallcraft-<ver>-windows-{x64,x86,arm64}.msi` and the portable
+  zips `recallcraft-<ver>-windows-{x64,x86,arm64}-portable.zip`, with one folder in each zip that
+  holds `recallcraft.exe`; `SHA256SUMS.txt` lists them. A copy updates from the file of its own
+  architecture and kind, downloaded into `%TEMP%\RecallCraft\updates`, checked against
+  `SHA256SUMS.txt` (and GitHub's own digest of the file, when it gives one) and deleted on a
+  mismatch. A file that isn't listed, or a release without `SHA256SUMS.txt`, is never installed.
+- **A copy the MSI installed:** Update now runs `msiexec /i <msi> /passive /norestart /l*v
+  install.log` through a detached `cmd.exe` that then starts `recallcraft.exe --background` from
+  where this copy is installed: the MSI closes RecallCraft while it installs
+  (`util:CloseApplication`), and a passive install shows no finish page to start it again. An
+  update keeps the copy's scope, read from where the program is: in `%LocalAppData%\Programs` it
+  was installed just for the owner, so `msiexec` gets `ALLUSERS=2 MSIINSTALLPERUSER=1` and nothing
+  is asked; anywhere else it is everyone's, and Windows asks for permission (UAC). If the owner
+  says no, nothing was closed, the new start hands over to the running service and ends, and the
+  update stays offered.
+- **A portable copy** (unzipped, `models\whisper*.gguf` beside `recallcraft.exe`): Update now
+  starts Windows PowerShell, detached and hidden, with a script that waits up to two minutes for
+  every RecallCraft program in that folder to close, unzips the new version over it (files only
+  in the folder stay) and starts `recallcraft.exe --background`; the service quits as soon as the
+  script has started. If anything is still running after two minutes, nothing is copied.
+- Never during a call: a check waits for the call to end, and Update now pressed during one
+  installs when it ends.
+- macOS, Linux, FreeBSD and builds in `target/` only tell the owner and open the release page. The
+  Flatpak has no network permission and never checks.
+
+`cargo test -p recallcraft-desktop github -- --ignored --nocapture` asks the real API as version
+0.0.1; with `RECALLCRAFT_TEST_DOWNLOAD=1` it also downloads and checks the x64 portable zip,
+without installing.
+
 ## What was left out, compared with ScreenGrabCraft
 
 - **The web build** (`packaging/web`, the wasm job, `cargo xtask wasm`): RecallCraft has no web
@@ -76,8 +114,6 @@ slow).
   window is the same program as the service.
 - **File types** (the MSI's ProgIds and Default apps capabilities, the Linux MIME package, the
   macOS document types): RecallCraft opens no files from Explorer or Finder.
-- **The update check** and what a release keeps for it: RecallCraft has no network features. The
-  AppImage still carries update information, which only AppImage tools outside RecallCraft read.
 - **The camera and screen recording permissions** (macOS): RecallCraft asks for the microphone only.
 - **The 1024 px icon PNGs**: the icon is drawn by `crates/desktop/src/icon.rs`, which goes up to
   512 px; the `.icns` stops there too.
@@ -245,4 +281,5 @@ need fixing on its first run.
 
 | Date | Change |
 |---|---|
+| 2026-11-24 | Automatic updates: what the update check relies on in a release, how an MSI copy and a portable copy update and start again |
 | 2026-11-24 | First version: packaging for Windows, macOS, Linux and FreeBSD from ScreenGrabCraft's; the speech model in every package; starting at sign-in per person; a release workflow of RecallCraft's own; what has and hasn't been checked |

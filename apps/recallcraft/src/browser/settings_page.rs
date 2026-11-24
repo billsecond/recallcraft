@@ -11,6 +11,7 @@ use recallcraft_model::{AudioExport, MicMode, RecordMode, Settings, TranscriptFo
 use recallcraft_store::Layout;
 
 use super::Action;
+use crate::update::Shared;
 
 #[derive(Default)]
 pub struct State {
@@ -42,8 +43,70 @@ fn list_of(text: &str) -> Vec<String> {
     text.split([',', ';', '\n']).map(|s| s.trim().to_ascii_lowercase()).filter(|s| !s.is_empty()).collect()
 }
 
+/// The Updates part: the switch, Check now, and what the service found (`upd`, while it runs).
+fn updates(ui: &mut egui::Ui, s: &mut Settings, upd: Option<&Shared>, in_call: bool, out: &mut Vec<Action>) {
+    section(ui, "Updates");
+    ui.checkbox(&mut s.check_updates, "Check for updates automatically");
+    ui.label(
+        RichText::new(
+            "A minute after it starts and then every six hours (never during a call), RecallCraft asks GitHub for its latest release. \
+             Nothing about you or what's recorded is sent.",
+        )
+        .small()
+        .weak(),
+    );
+    let Some(u) = upd else {
+        ui.label(RichText::new("Updates are checked while RecallCraft runs in the tray.").small().weak());
+        return;
+    };
+    if u.flatpak {
+        ui.label(RichText::new("The Flatpak has no network access, so RecallCraft can't check for updates here.").small().weak());
+        ui.hyperlink_to("The releases page", format!("{}/releases", recallcraft_model::HOMEPAGE));
+        return;
+    }
+    ui.horizontal(|ui| {
+        if ui.add_enabled(!u.checking, egui::Button::new("Check now")).clicked() {
+            out.push(Action::Tell(vec!["--check-updates".to_string(), "settings".to_string()]));
+        }
+        if !u.status.is_empty() {
+            if u.failed {
+                ui.colored_label(super::style::AMBER, &u.status);
+            } else {
+                ui.label(&u.status);
+            }
+        }
+    });
+    let Some(o) = &u.offer else { return };
+    ui.add_space(4.0);
+    if o.ready {
+        ui.label(RichText::new(format!("RecallCraft {} is ready to install.", o.version)).strong());
+        ui.horizontal(|ui| {
+            let label = if u.installing {
+                "Installing…".to_string()
+            } else if u.after_call {
+                "Installs when the call ends".to_string()
+            } else {
+                format!("Update now to {}", o.version)
+            };
+            if ui.add_enabled(!u.installing && !u.after_call, egui::Button::new(label)).clicked() {
+                out.push(Action::Tell(vec!["--install-update".to_string()]));
+            }
+            ui.hyperlink_to("What's new", &o.page);
+        });
+        let note =
+            if in_call { "During a call it's installed when the call ends, so the call's recording isn't cut short." } else { &u.install_note };
+        ui.label(RichText::new(note).small().weak());
+    } else {
+        ui.label(RichText::new(format!("RecallCraft {} is available.", o.version)).strong());
+        if let Some(p) = &o.problem {
+            ui.colored_label(super::style::AMBER, format!("The download didn't work: {p}."));
+        }
+        ui.hyperlink_to("Get it from its release page", &o.page);
+    }
+}
+
 /// Shows the settings; true when one changed.
-pub fn show(ui: &mut egui::Ui, s: &mut Settings, st: &mut State, layout: &Layout) -> (bool, Vec<Action>) {
+pub fn show(ui: &mut egui::Ui, s: &mut Settings, st: &mut State, layout: &Layout, upd: Option<&Shared>, in_call: bool) -> (bool, Vec<Action>) {
     let before = s.clone();
     let mut out = Vec::new();
     egui::ScrollArea::vertical().id_salt("settings").auto_shrink([false, false]).show(ui, |ui| {
@@ -242,6 +305,8 @@ pub fn show(ui: &mut egui::Ui, s: &mut Settings, st: &mut State, layout: &Layout
             out.push(Action::Quit);
         }
 
+        updates(ui, s, upd, in_call, &mut out);
+
         section(ui, "About");
         ui.label(version::line("RecallCraft"));
         ui.label(match models::speech_model() {
@@ -250,8 +315,9 @@ pub fn show(ui: &mut egui::Ui, s: &mut Settings, st: &mut State, layout: &Layout
         });
         ui.label(
             RichText::new(
-                "Everything stays on this computer: nothing is sent anywhere, and the speech is written down here too. \
-                 In many places everyone on a call has to agree to it being recorded; that's up to you.",
+                "What's recorded stays on this computer, and the speech is written down here too. The only thing RecallCraft asks \
+                 the network for is whether there's a newer version (Updates, above). In many places everyone on a call has to \
+                 agree to it being recorded; that's up to you.",
             )
             .small()
             .weak(),

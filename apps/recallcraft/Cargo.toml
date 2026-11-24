@@ -24,6 +24,7 @@ global-hotkey = { workspace = true }
 winit = { workspace = true }
 opener = { workspace = true }
 log = { workspace = true }
+serde = { workspace = true }
 serde_json = { workspace = true }
 
 [target.'cfg(target_os = "windows")'.dependencies]

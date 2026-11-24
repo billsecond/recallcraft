@@ -17,7 +17,7 @@ The last two days of what you heard and said, every call written down as it happ
 - **Live transcript.** Whisper runs on your computer, in a program of its own at below-normal priority, only on what's said during calls; the others are told apart by their voices.
 - **Replay** the last 30 seconds at 1.5× (Ctrl+Alt+R), **browse** the calls by day, **search** what was said, and **export** the sound (WAV, stereo WAV, Opus) and the transcript (text, Markdown, SubRip, WebVTT, JSON).
 
-**Early alpha.** The foundations are in place and tested; see the [README](https://github.com/GITHUB_REPOSITORY#readme) and the roadmap for what's next. **In many places everyone on a call must agree to it being recorded: that is yours to arrange.** Nothing leaves your computer: there's no account, no cloud, no telemetry, and RecallCraft has no network features at all (not even an update check).
+**Early alpha.** The foundations are in place and tested; see the [README](https://github.com/GITHUB_REPOSITORY#readme) and the roadmap for what's next. **In many places everyone on a call must agree to it being recorded: that is yours to arrange.** Nothing you record leaves your computer: there's no account, no cloud, no telemetry. The only network request is the update check, which asks GitHub for the latest release and sends nothing about you (turn it off in Settings › Updates).
 
 RecallCraft for Windows, macOS, Linux and FreeBSD. Every file is listed with its SHA-256 in `SHA256SUMS.txt`. **Windows is where RecallCraft records both sides of a call and finds calls on its own;** on macOS, Linux and FreeBSD it records the microphone, and the rest isn't done there yet.
 

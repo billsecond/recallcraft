@@ -16,3 +16,6 @@ pub use speaker::{Speaker, Stream};
 
 /// RecallCraft's version.
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
+
+/// Where RecallCraft is published: its source, releases and issues.
+pub const HOMEPAGE: &str = "https://github.com/billsecond/recallcraft";
