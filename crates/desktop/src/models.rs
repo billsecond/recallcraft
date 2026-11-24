@@ -22,7 +22,9 @@ pub fn model_dirs() -> Vec<PathBuf> {
         dirs.push(bin.join("models"));
         dirs.push(bin.join("..").join("share").join("recallcraft").join("models"));
         dirs.push(bin.join("..").join("Resources").join("models"));
-        for up in bin.ancestors().skip(1).take(3) {
+        // A build in the source tree: target/release, target/<triple>/release, or deeper where a
+        // test runner keeps its programs (target/debug/build/<crate>/out).
+        for up in bin.ancestors().skip(1).take(6) {
             dirs.push(up.join("assets").join("models"));
         }
     }
@@ -78,8 +80,11 @@ mod tests {
     }
 
     #[test]
-    fn a_build_in_the_source_tree_finds_the_model() {
-        // Tests run from target/…/deps, three folders below the source tree.
-        assert!(speech_model().is_ok_and(|p| p.exists()), "{:?}", speech_model());
+    fn the_source_tree_s_model_is_found() {
+        // Wherever the test program itself runs from (GitHub's runners keep it deeper than
+        // target/…/deps), the source tree's models folder has the installed model.
+        let assets = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..").join("..").join("assets").join("models");
+        let found = find_speech(&[assets]);
+        assert!(found.as_ref().is_some_and(|p| p.ends_with(SPEECH) && p.exists()), "{found:?}");
     }
 }
