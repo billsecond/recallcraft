@@ -120,9 +120,9 @@ jobs:
           $userRun = 'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Run'
           $machineRun = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Run'
           $expected = "`"$dir\recallcraft.exe`" --background"
-          $run = (Get-ItemProperty $userRun).RecallCraft
+          $run = (Get-ItemProperty $userRun -ErrorAction SilentlyContinue).RecallCraft
           if ($run -ne $expected) { throw "sign-in entry is '$run', expected '$expected'" }
-          if ((Get-ItemProperty $machineRun).RecallCraft) { throw 'the install wrote a sign-in entry for everyone (HKLM)' }
+          if ((Get-ItemProperty $machineRun -ErrorAction SilentlyContinue).RecallCraft) { throw 'the install wrote a sign-in entry for everyone (HKLM)' }
           $app = (Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\recallcraft.exe').'(default)'
           if ($app -ne "$dir\recallcraft.exe") { throw "App Paths entry is '$app', expected '$dir\recallcraft.exe'" }
 
@@ -135,7 +135,7 @@ jobs:
           if (Get-Process recallcraft -ErrorAction SilentlyContinue) { throw 'RecallCraft is still running after uninstall' }
           if (Test-Path (Join-Path $dir 'recallcraft.exe')) { throw 'uninstall left recallcraft.exe behind' }
           if (Test-Path (Join-Path $dir 'models')) { throw 'uninstall left the model behind' }
-          if ((Get-ItemProperty $userRun).RecallCraft) { throw 'uninstall left the sign-in entry behind' }
+          if ((Get-ItemProperty $userRun -ErrorAction SilentlyContinue).RecallCraft) { throw 'uninstall left the sign-in entry behind' }
           if ((Get-ItemProperty 'HKCU:\SOFTWARE\RecallCraft\Installer' -ErrorAction SilentlyContinue).StartAtSignIn) { throw "uninstall left the installer's own value behind" }
           if (Test-Path 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\recallcraft.exe') { throw 'uninstall left App Paths behind' }
       # The same installer just for one person (ALLUSERS=2 MSIINSTALLPERUSER=1, what "Just for me"
@@ -173,9 +173,9 @@ jobs:
           # Shown, not judged: Programs and Features' own records of it.
           Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*' -ErrorAction SilentlyContinue | Where-Object { $_.DisplayName -eq 'RecallCraft' } | Format-List DisplayName, DisplayVersion, InstallLocation, PSChildName
           $expected = "`"$dir\recallcraft.exe`" --background"
-          $run = (Get-ItemProperty 'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Run').RecallCraft
+          $run = (Get-ItemProperty 'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Run' -ErrorAction SilentlyContinue).RecallCraft
           if ($run -ne $expected) { throw "per-user sign-in entry is '$run', expected '$expected'" }
-          if ((Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Run').RecallCraft) { throw 'the per-user install wrote the sign-in entry for everyone' }
+          if ((Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Run' -ErrorAction SilentlyContinue).RecallCraft) { throw 'the per-user install wrote the sign-in entry for everyone' }
           $app = (Get-ItemProperty 'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\recallcraft.exe').'(default)'
           if ($app -ne "$dir\recallcraft.exe") { throw "per-user App Paths entry is '$app', expected '$dir\recallcraft.exe'" }
           if (Test-Path 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\recallcraft.exe') { throw 'the per-user install wrote App Paths for everyone' }
@@ -193,7 +193,7 @@ jobs:
           if ($p.ExitCode -ne 0) { Get-Content "$env:RUNNER_TEMP\uninstall-user.log" -Tail 60; throw "per-user uninstall failed ($($p.ExitCode))" }
           if (Get-Process recallcraft -ErrorAction SilentlyContinue) { throw 'RecallCraft is still running after the per-user uninstall' }
           if (Test-Path (Join-Path $dir 'recallcraft.exe')) { throw 'the per-user uninstall left recallcraft.exe behind' }
-          if ((Get-ItemProperty 'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Run').RecallCraft) { throw 'the per-user uninstall left the sign-in entry behind' }
+          if ((Get-ItemProperty 'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Run' -ErrorAction SilentlyContinue).RecallCraft) { throw 'the per-user uninstall left the sign-in entry behind' }
           if (Test-Path 'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\recallcraft.exe') { throw 'the per-user uninstall left App Paths behind' }
       - uses: actions/upload-artifact@v4
         with:
