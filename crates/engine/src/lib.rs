@@ -50,6 +50,8 @@ pub struct Config {
 #[serde(default)]
 pub struct Status {
     pub recording: bool,
+    /// Recording only during calls, and no call just now.
+    pub waiting_for_call: bool,
     pub paused_until_ms: u64,
     pub mic: String,
     pub mic_level: f32,

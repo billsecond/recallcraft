@@ -23,9 +23,12 @@ tray-icon = { workspace = true }
 global-hotkey = { workspace = true }
 winit = { workspace = true }
 opener = { workspace = true }
-pollster = "0.4"
 log = { workspace = true }
 serde_json = { workspace = true }
+
+[target.'cfg(target_os = "windows")'.dependencies]
+# The graphics probe at start-up (graphics.rs) waits on wgpu's adapters.
+pollster = "0.4"
 
 [build-dependencies]
 # Icon + version info for the .exe; build.rs only uses it when the target is Windows.

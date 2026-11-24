@@ -37,7 +37,7 @@ fn main() {
                     "{} ({}): {blocks} blocks, {:.2} s of sound in 3 s, loudest {:.3}, first block {} ms old",
                     c.name,
                     match source {
-                        Source::System => "computer sound",
+                        Source::System | Source::Speaker(_) => "computer sound",
                         Source::Mic(_) => "microphone",
                     },
                     samples as f32 / 48_000.0,

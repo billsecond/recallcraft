@@ -9,9 +9,6 @@ description = "Knowing when a call is on: which programs are using a microphone,
 [lints]
 workspace = true
 
-[dependencies]
-log = { workspace = true }
-
 # Windows: the programs with a microphone open (WASAPI's audio sessions), every program and its
 # parent (a tool-help snapshot), and their windows' titles, through safe bindings.
 [target.'cfg(target_os = "windows")'.dependencies]

@@ -30,6 +30,17 @@ pub fn default_microphone(communications: bool) -> Option<Device> {
     crate::wasapi_capture::default_microphone(communications)
 }
 
+/// The system's default speaker.
+#[cfg(target_os = "windows")]
+pub fn default_speaker() -> Option<Device> {
+    crate::wasapi_capture::default_speaker()
+}
+
+#[cfg(not(target_os = "windows"))]
+pub fn default_speaker() -> Option<Device> {
+    None
+}
+
 #[cfg(not(target_os = "windows"))]
 pub fn microphones() -> Vec<Device> {
     crate::cpal_capture::microphones()

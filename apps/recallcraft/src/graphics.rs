@@ -1,6 +1,8 @@
 //! Windows graphics instance configuration, applied before wgpu can initialize any driver
 //! (carried over from ScreenGrabCraft and MailCraft, where #316 and the AMD driver crash below
 //! were found).
+// Choosing the backends happens only on Windows; elsewhere wgpu's own choice stands.
+#![cfg_attr(not(target_os = "windows"), allow(dead_code))]
 
 use eframe::{
     NativeOptions,

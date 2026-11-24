@@ -110,6 +110,8 @@ pub enum Action {
     DeleteCall(String),
     Open(Page),
     Note(String),
+    /// Quit RecallCraft (the service, and the window).
+    Quit,
 }
 
 enum Confirm {
@@ -141,6 +143,27 @@ pub struct Browser {
     settings_state: settings_page::State,
     reader: RingReader,
     opening: graphics::Opening,
+    /// Hidden in the tray (closed or minimised while the service runs).
+    hidden: bool,
+    /// Closing for real (Quit).
+    quitting: bool,
+    /// Saying, the first time, that RecallCraft goes on in the tray.
+    tray_note: bool,
+    /// The window was minimised when last looked at (it says so for a frame after it's shown).
+    minimised: bool,
+}
+
+/// Whether the window can go back to a tray: it was opened by the service, and the service is
+/// running.
+fn has_tray(status: Option<&Status>) -> bool {
+    std::env::var_os(crate::FROM_SERVICE).is_some() && (status.is_some() || instance::running("service"))
+}
+
+/// Asks the service to quit (it closes the window too).
+fn quit_service() {
+    std::thread::spawn(|| {
+        instance::tell("service", &["--quit".to_string()]);
+    });
 }
 
 impl Browser {
@@ -172,6 +195,93 @@ impl Browser {
             everything: everything::State::default(),
             settings_state: settings_page::State::default(),
             opening,
+            hidden: false,
+            quitting: false,
+            tray_note: false,
+            minimised: false,
+        }
+    }
+
+    fn show(&mut self, ctx: &egui::Context) {
+        self.hidden = false;
+        ctx.send_viewport_cmd(egui::ViewportCommand::Visible(true));
+        ctx.send_viewport_cmd(egui::ViewportCommand::Minimized(false));
+        ctx.send_viewport_cmd(egui::ViewportCommand::Focus);
+        ctx.request_repaint();
+    }
+
+    fn hide(&mut self, ctx: &egui::Context) {
+        self.hidden = true;
+        self.tray_note = false;
+        ctx.send_viewport_cmd(egui::ViewportCommand::Visible(false));
+    }
+
+    fn quit(&mut self, ctx: &egui::Context) {
+        self.quitting = true;
+        ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+    }
+
+    /// Closing or minimising the window puts it in the tray, while there's a tray to go back to;
+    /// only Quit ends it.
+    fn hide_when_closed(&mut self, ctx: &egui::Context) {
+        let (close, minimised) = ctx.input(|i| (i.viewport().close_requested(), i.viewport().minimized == Some(true)));
+        // Only the moment it's minimised counts.
+        let just_minimised = minimised && !self.minimised && !self.hidden;
+        self.minimised = minimised;
+        if self.quitting || !(close || just_minimised) {
+            return;
+        }
+        if !has_tray(self.status.as_ref()) {
+            // Started on its own, with no service running: closing ends it.
+            return;
+        }
+        if close {
+            ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);
+        }
+        if close && !self.settings.told_about_tray {
+            self.tray_note = true;
+            return;
+        }
+        self.hide(ctx);
+    }
+
+    /// The first time the window is closed: RecallCraft goes on in the tray.
+    fn tray_note(&mut self, ctx: &egui::Context) {
+        if !self.tray_note {
+            return;
+        }
+        let mut choice = None;
+        egui::Modal::new(egui::Id::new("tray-note")).show(ctx, |ui| {
+            ui.set_width(420.0);
+            ui.heading("RecallCraft keeps going in the tray");
+            ui.add_space(4.0);
+            let what = match self.settings.record_mode {
+                recallcraft_model::RecordMode::Always => "It goes on recording",
+                recallcraft_model::RecordMode::CallsOnly => "It goes on recording your calls",
+            };
+            ui.label(format!(
+                "{what} while this window is closed. Click its icon in the tray, by the clock (it may be under the ^), to open it again. Quit is in its menu."
+            ));
+            ui.add_space(8.0);
+            ui.horizontal(|ui| {
+                if ui.button("OK").clicked() {
+                    choice = Some(false);
+                }
+                if ui.button("Quit RecallCraft").clicked() {
+                    choice = Some(true);
+                }
+            });
+        });
+        if let Some(quit) = choice {
+            self.tray_note = false;
+            self.settings = prefs::update(|x| x.told_about_tray = true);
+            self.settings_seen = prefs::modified();
+            if quit {
+                quit_service();
+                self.quit(ctx);
+            } else {
+                self.hide(ctx);
+            }
         }
     }
 
@@ -182,12 +292,14 @@ impl Browser {
     /// What changed on disk, and what was handed over.
     fn poll(&mut self, ctx: &egui::Context) {
         for args in self.guard.handed() {
+            if args.iter().any(|a| a == "--quit") {
+                self.quit(ctx);
+                return;
+            }
             if args.iter().any(|a| a == "--settings") {
                 self.page = Page::Settings;
             }
-            ctx.send_viewport_cmd(egui::ViewportCommand::Visible(true));
-            ctx.send_viewport_cmd(egui::ViewportCommand::Minimized(false));
-            ctx.send_viewport_cmd(egui::ViewportCommand::Focus);
+            self.show(ctx);
         }
         let seen = prefs::modified();
         if seen != self.settings_seen {
@@ -296,6 +408,8 @@ impl Browser {
             Action::DeleteCall(id) => self.confirm = Some(Confirm::DeleteCall(id)),
             Action::Open(p) => self.page = p,
             Action::Note(n) => self.note(n),
+            // Handled where the window's context is at hand.
+            Action::Quit => {}
         }
     }
 
@@ -345,6 +459,7 @@ impl Browser {
                     Some(st) if st.in_call() => {
                         (style::RED, format!("{} · {}", st.call_title, time::duration_words(now.saturating_sub(st.call_started_ms))))
                     }
+                    Some(st) if st.waiting_for_call => (egui::Color32::GRAY, "Waiting for a call (recording only during calls)".to_string()),
                     Some(st) if !st.problems.is_empty() => (style::AMBER, st.problems.join("; ")),
                     Some(st) if st.recording => (style::TEAL, "Recording".to_string()),
                     Some(_) => (egui::Color32::GRAY, "Starting…".to_string()),
@@ -482,9 +597,19 @@ impl Browser {
 }
 
 impl eframe::App for Browser {
+    /// Runs while the window is hidden too: what's handed over (Show, Quit), and closing or
+    /// minimising into the tray.
+    fn logic(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        self.poll(ctx);
+        self.hide_when_closed(ctx);
+        if self.hidden {
+            // Hidden in the tray: a look now and then for the tray's Show.
+            ctx.request_repaint_after(Duration::from_secs(1));
+        }
+    }
+
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         let ctx = ui.ctx().clone();
-        self.poll(&ctx);
         let mut actions = Vec::new();
         egui::Panel::top("top").show(ui, |ui| {
             ui.add_space(4.0);
@@ -552,7 +677,13 @@ impl eframe::App for Browser {
             }
         }
         self.confirm(&ctx);
+        self.tray_note(&ctx);
         for a in actions {
+            if a == Action::Quit {
+                quit_service();
+                self.quit(&ctx);
+                continue;
+            }
             self.act(a);
         }
         self.opening.opened();

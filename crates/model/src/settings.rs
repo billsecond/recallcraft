@@ -3,7 +3,44 @@
 
 use serde::{Deserialize, Serialize};
 
-/// When the microphone is recorded.
+/// What's recorded. Kept as `always` or `calls_only`; anything else (a mode a later version
+/// writes) reads as [`RecordMode::Always`], and the other settings stay.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(from = "String", into = "String")]
+pub enum RecordMode {
+    /// Everything, all the time: the last hours are kept, calls or not.
+    #[default]
+    Always,
+    /// Only during calls: the microphone and the computer's sound are opened when a call starts,
+    /// and closed when it ends.
+    CallsOnly,
+}
+
+impl From<String> for RecordMode {
+    fn from(s: String) -> RecordMode {
+        if s.trim() == "calls_only" { RecordMode::CallsOnly } else { RecordMode::Always }
+    }
+}
+
+impl From<RecordMode> for String {
+    fn from(m: RecordMode) -> String {
+        match m {
+            RecordMode::Always => "always".to_string(),
+            RecordMode::CallsOnly => "calls_only".to_string(),
+        }
+    }
+}
+
+impl RecordMode {
+    pub fn label(self) -> &'static str {
+        match self {
+            RecordMode::Always => "Record all the time",
+            RecordMode::CallsOnly => "Record only during calls",
+        }
+    }
+}
+
+/// When the microphone is recorded (while recording all the time).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum MicMode {
@@ -128,6 +165,10 @@ pub struct Settings {
     pub recording: bool,
     /// Paused until then (ms since 1970); 0 is not paused.
     pub paused_until_ms: u64,
+    /// All the time, or only during calls.
+    pub record_mode: RecordMode,
+    /// The window was closed once: it was said that RecallCraft goes on in the tray.
+    pub told_about_tray: bool,
     /// How long everything heard is kept, in hours.
     pub keep_audio_hours: u32,
     /// How long calls are kept, in days (their sound and transcript); 0 keeps them only as long as
@@ -174,6 +215,8 @@ impl Default for Settings {
             your_name: String::new(),
             recording: true,
             paused_until_ms: 0,
+            record_mode: RecordMode::Always,
+            told_about_tray: false,
             keep_audio_hours: 48,
             keep_calls_days: 30,
             data_folder: String::new(),
@@ -278,6 +321,17 @@ mod tests {
         assert_eq!(Settings::from_json("{}").keep_audio_ms(), 48 * 3_600_000);
         let d = Settings { keep_calls_days: 0, ..Settings::default() };
         assert_eq!(d.keep_calls_ms(), d.keep_audio_ms(), "calls are never kept for less than everything");
+    }
+
+    #[test]
+    fn the_recording_mode_reads_back_and_defaults_to_always() {
+        assert_eq!(Settings::from_json("{}").record_mode, RecordMode::Always, "an older settings file records all the time");
+        let s = Settings::from_json(r#"{"record_mode": "calls_only"}"#);
+        assert_eq!(s.record_mode, RecordMode::CallsOnly);
+        let back = Settings::from_json(&serde_json::to_string(&s).unwrap());
+        assert_eq!(back.record_mode, RecordMode::CallsOnly);
+        let odd = Settings::from_json(r#"{"record_mode": "sometimes", "keep_audio_hours": 12}"#);
+        assert_eq!((odd.record_mode, odd.keep_audio_hours), (RecordMode::Always, 12), "a mode it doesn't know is Always; the rest stays");
     }
 
     #[test]

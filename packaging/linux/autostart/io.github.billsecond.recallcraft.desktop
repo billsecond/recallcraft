@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=RecallCraft
+Comment=The recorder: the tray icon, the last two days of sound and the replay shortcut
+Exec=recallcraft --background
+TryExec=recallcraft
+Icon=io.github.billsecond.recallcraft
+Terminal=false
+NoDisplay=true
+X-GNOME-Autostart-enabled=true

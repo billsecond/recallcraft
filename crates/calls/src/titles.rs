@@ -83,10 +83,10 @@ pub fn clean(title: &str) -> Option<String> {
             break;
         }
     }
-    // Teams' main window: its first part is one of its sections.
-    if let Some((first, _)) = t.split_once(" | ")
-        && SECTIONS.contains(&first.trim().to_lowercase().as_str())
-    {
+    // Teams' main window: its first part is one of its sections, or it names the account (an
+    // email address, the organisation's domain). It's the owner's, not the call's.
+    let parts: Vec<&str> = t.split(" | ").map(str::trim).collect();
+    if parts.first().is_some_and(|first| SECTIONS.contains(&first.to_lowercase().as_str())) || parts.iter().any(|p| is_account(p)) {
         return None;
     }
     // Zoom's title for a meeting has the meeting's name after "Zoom Meeting - " at times.
@@ -101,11 +101,63 @@ pub fn clean(title: &str) -> Option<String> {
     Some(t.chars().take(160).collect())
 }
 
-/// The meeting's title: of the app's windows during the call (`during`), one that wasn't there
-/// before it (`before`) first, then any that says something.
-pub fn pick(before: &[String], during: &[String]) -> Option<String> {
-    let new = during.iter().filter(|t| !before.contains(t)).find_map(|t| clean(t));
-    new.or_else(|| during.iter().find_map(|t| clean(t)))
+/// Whether part of a title is an account: an email address, or a bare domain
+/// (`bravasystems.com`).
+pub fn is_account(part: &str) -> bool {
+    let p = part.trim();
+    let domain = !p.contains(' ')
+        && p.contains('.')
+        && p.rsplit('.').next().is_some_and(|tld| (2..=6).contains(&tld.len()) && tld.chars().all(|c| c.is_ascii_alphabetic()));
+    p.contains('@') || domain
+}
+
+/// The owner's own names, from the email addresses in the app's titles: `william.daugherty@…`
+/// is "william daugherty" (never taken for the other person's name).
+pub fn own_names(titles: &[String]) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    for t in titles {
+        for word in t.split(|c: char| c.is_whitespace() || c == '|' || c == '(' || c == ')' || c == ',') {
+            let Some((local, _)) = word.split_once('@') else { continue };
+            let name: String = local.split(['.', '_', '-']).filter(|w| !w.is_empty()).collect::<Vec<_>>().join(" ").to_lowercase();
+            if !name.is_empty() && !out.contains(&name) {
+                out.push(name);
+            }
+        }
+    }
+    out
+}
+
+/// Whether a name is the owner's (`your_name` from the settings, or one of [`own_names`]).
+pub fn is_own(name: &str, your_name: &str, own: &[String]) -> bool {
+    let n = name.trim().to_lowercase();
+    let first = n.split_whitespace().next().unwrap_or_default().to_string();
+    !n.is_empty()
+        && ((!your_name.trim().is_empty() && n == your_name.trim().to_lowercase())
+            || own
+                .iter()
+                .any(|o| *o == n || (o.split_whitespace().count() > 1 && o.starts_with(&format!("{first} ")) && n.split_whitespace().count() == 1)))
+}
+
+/// The meeting's title: of the app's windows during the call (`during`), the best of those that
+/// say something: one that wasn't there before the call (`before`), and one that names a person
+/// other than the owner, first.
+pub fn pick(before: &[String], during: &[String], your_name: &str) -> Option<String> {
+    let own = own_names(before.iter().chain(during).cloned().collect::<Vec<_>>().as_slice());
+    let mut best: Option<(u8, String)> = None;
+    for t in during {
+        let Some(c) = clean(t) else { continue };
+        let mut score = 0u8;
+        if !before.contains(t) {
+            score += 2;
+        }
+        if person(&c).is_some_and(|p| !is_own(&p, your_name, &own)) {
+            score += 1;
+        }
+        if best.as_ref().is_none_or(|(s, _)| score > *s) {
+            best = Some((score, c));
+        }
+    }
+    best.map(|(_, t)| t)
 }
 
 /// A meeting in a browser tab, by the window's title (the tab showing): the meeting service's
@@ -190,7 +242,8 @@ pub fn looks_like_a_name(text: &str) -> bool {
 
 /// The other person's name, when a one-to-one call's title says it.
 pub fn person(title: &str) -> Option<String> {
-    let t = title.trim();
+    // "(External)", "(Guest)" and the like aren't part of the name.
+    let t = title.split(" (").next().unwrap_or_default().trim();
     for p in [
         "Call with ",
         "call with ",
@@ -232,9 +285,38 @@ mod tests {
     fn the_meeting_window_is_the_new_one() {
         let before = vec!["Chat | Contoso | Microsoft Teams".to_string(), "Planning | Microsoft Teams".to_string()];
         let during = vec!["Planning | Microsoft Teams".to_string(), "Budget review | Microsoft Teams".to_string()];
-        assert_eq!(pick(&before, &during).as_deref(), Some("Budget review"));
-        assert_eq!(pick(&during, &during).as_deref(), Some("Planning"));
-        assert_eq!(pick(&[], &["Microsoft Teams".into()]), None);
+        assert_eq!(pick(&before, &during, "").as_deref(), Some("Budget review"));
+        assert_eq!(pick(&during, &during, "").as_deref(), Some("Planning"));
+        assert_eq!(pick(&[], &["Microsoft Teams".into()], ""), None);
+    }
+
+    #[test]
+    fn the_owner_s_account_is_never_the_call_and_the_other_person_is() {
+        // Teams' main window names the organisation and the owner's account.
+        let account = "bravasystems.com | william.daugherty@bravasystems.com | Microsoft Teams".to_string();
+        assert_eq!(clean(&account), None);
+        assert_eq!(clean("Calls | Contoso | Microsoft Teams"), None);
+        assert_eq!(clean("contoso.com"), None);
+        // The call window, which appeared with the call, names who it's with.
+        let call = "Kat Jones (External) | Microsoft Teams".to_string();
+        assert_eq!(pick(std::slice::from_ref(&account), &[account.clone(), call.clone()], "").as_deref(), Some("Kat Jones (External)"));
+        assert_eq!(person("Kat Jones (External)").as_deref(), Some("Kat Jones"));
+        // A window that only names the owner isn't who the call is with.
+        let own = own_names(std::slice::from_ref(&account));
+        assert_eq!(own, vec!["william daugherty".to_string()]);
+        assert!(is_own("William Daugherty", "", &own));
+        assert!(is_own("William", "", &own), "the owner's first name alone");
+        assert!(is_own("Bill", "Bill", &[]), "the name in the settings");
+        assert!(!is_own("Kat Jones", "Bill", &own));
+        let mine = "William Daugherty | Microsoft Teams".to_string();
+        assert_eq!(
+            pick(std::slice::from_ref(&account), &[mine, call], "").as_deref(),
+            Some("Kat Jones (External)"),
+            "the other person wins over the owner"
+        );
+        // Nothing but the account: no title, rather than the owner's own details.
+        assert_eq!(pick(&[], &[account], ""), None);
+        assert!(is_account("someone@example.org") && is_account("example.co.uk") && !is_account("Q3.5 planning") && !is_account("v2.6.7"));
     }
 
     #[test]

@@ -6,5 +6,7 @@ license.workspace = true
 publish = false
 
 [dependencies]
-# `cargo xtask icon` draws the icon file.
+# `cargo xtask icon` draws the icon (the drawing is the desktop crate's) and writes its files.
 recallcraft-desktop = { workspace = true }
+# The icon's PNGs (the version already in Cargo.lock, through the tray).
+png = "0.18.1"

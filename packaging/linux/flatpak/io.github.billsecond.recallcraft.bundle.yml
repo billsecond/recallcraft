@@ -1,0 +1,60 @@
+# Flatpak manifest for the single-file bundle attached to every GitHub release
+# (recallcraft-<version>-linux-<arch>.flatpak). Build it with packaging/linux/flatpak-bundle.sh.
+#
+# It repackages the release's own Linux tarball (recallcraft-<version>-linux-<arch>.tar.gz, built
+# on Ubuntu 22.04 by package.sh) instead of compiling Rust inside flatpak-builder: no network and
+# no vendored crate sources during the build, a few seconds instead of 20+ minutes, and
+# byte-for-byte the same binaries as the AppImage/deb/rpm. The script unpacks the tarball into
+# `stage/` next to a copy of this file. The binaries need glibc >= 2.35 and ALSA, and load X11,
+# Wayland, xkbcommon and Vulkan at runtime; the freedesktop runtime has all of them (its ALSA
+# plays and records through PulseAudio/PipeWire), and the GPU driver comes from its
+# org.freedesktop.Platform.GL extension.
+#
+# One Flatpak holds both programs: RecallCraft (the service and its window) is the command, and
+# recallcraft-cli runs in the same sandbox (`flatpak run --command=recallcraft-cli ...`). Its
+# recording and settings stay in the sandbox's own folders (~/.var/app/<id>/). Starting at sign-in
+# isn't arranged for the Flatpak yet (the autostart entry RecallCraft writes stays inside the
+# sandbox), so the tarball's autostart entry and systemd unit stay out.
+#
+# io.github.billsecond.recallcraft.yml (same directory) is the from-source manifest for Flathub.
+# Keep runtime, runtime-version, sdk and finish-args identical in both (packaging-lint checks this).
+id: io.github.billsecond.recallcraft
+runtime: org.freedesktop.Platform
+runtime-version: '25.08'
+sdk: org.freedesktop.Sdk
+command: recallcraft
+finish-args:
+  # Display: Wayland first; X11 only when no Wayland compositor is running.
+  - --socket=wayland
+  - --socket=fallback-x11
+  # X11 shared memory (MIT-SHM). Without it the X11 fallback is slow or fails.
+  - --share=ipc
+  # GPU access for the window's renderer.
+  - --device=dri
+  # Sound: the microphone it records, and replaying what was recorded.
+  - --socket=pulseaudio
+  # Exports go to Documents/RecallCraft unless the settings say otherwise; other folders are
+  # chosen through the file-chooser portal.
+  - --filesystem=xdg-documents
+  # The tray icon (D-Bus StatusNotifierItem): talk to the desktop's StatusNotifierWatcher.
+  - --talk-name=org.kde.StatusNotifierWatcher
+  # Deliberately not granted: network (RecallCraft has no network features), home/host
+  # filesystem access.
+modules:
+  - name: recallcraft
+    buildsystem: simple
+    build-commands:
+      - install -Dm755 bin/recallcraft /app/bin/recallcraft
+      - install -Dm755 bin/recallcraft-cli /app/bin/recallcraft-cli
+      - install -Dm644 share/applications/io.github.billsecond.recallcraft.desktop /app/share/applications/io.github.billsecond.recallcraft.desktop
+      # Already has the release's version and date substituted by package.sh.
+      - install -Dm644 share/metainfo/io.github.billsecond.recallcraft.metainfo.xml /app/share/metainfo/io.github.billsecond.recallcraft.metainfo.xml
+      - mkdir -p /app/share/icons /app/share/doc && cp -R share/icons/hicolor /app/share/icons/ && cp -R share/doc/recallcraft /app/share/doc/
+      # The speech model, its licence and readme, where the programs look for it
+      # (../share/recallcraft/models from /app/bin).
+      - install -Dm644 share/recallcraft/models/whisper-base.en-q8_0.gguf /app/share/recallcraft/models/whisper-base.en-q8_0.gguf
+      - install -Dm644 share/recallcraft/models/LICENSE-WHISPER.txt /app/share/recallcraft/models/LICENSE-WHISPER.txt
+      - install -Dm644 share/recallcraft/models/README.md /app/share/recallcraft/models/README.md
+    sources:
+      - type: dir
+        path: stage

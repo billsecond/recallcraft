@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- AppStream metadata (software centres, Flathub). Template: package.sh and the Flatpak manifests
+     substitute @VERSION@ and @DATE@ from Cargo.toml and the build date. -->
+<component type="desktop-application">
+  <id>io.github.billsecond.recallcraft</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT OR Apache-2.0</project_license>
+  <name>RecallCraft</name>
+  <summary>Keep the last two days of what was said, and write calls down</summary>
+  <developer id="io.github.billsecond">
+    <name>RecallCraft contributors</name>
+  </developer>
+  <description>
+    <p>
+      RecallCraft waits in the system tray and keeps recording, quietly: it keeps the last hours of your microphone (48 by default, as long as you choose) and throws away what is older. What is said is written down on this computer by Whisper, in a program of its own at low priority, and a window lists it all to replay at any speed, search and export: the sound as WAV or Opus, the words as text, Markdown, SubRip, WebVTT or JSON.
+    </p>
+    <p>
+      Everything stays on this computer: there is no account, no cloud and no telemetry, and RecallCraft has no network features at all. In many places everyone on a call must agree to it being recorded; that is yours to arrange. On Linux RecallCraft records the microphone; recording what the computer plays, and finding calls on their own, are not done here yet.
+    </p>
+  </description>
+  <launchable type="desktop-id">io.github.billsecond.recallcraft.desktop</launchable>
+  <icon type="stock">io.github.billsecond.recallcraft</icon>
+  <!-- Only url types known to appstream 0.15 (Ubuntu 22.04, where CI validates): no vcs-browser. -->
+  <url type="homepage">https://github.com/billsecond/recallcraft</url>
+  <url type="bugtracker">https://github.com/billsecond/recallcraft/issues</url>
+  <url type="help">https://github.com/billsecond/recallcraft</url>
+  <url type="contact">https://github.com/billsecond/recallcraft/issues</url>
+  <categories>
+    <category>AudioVideo</category>
+    <category>Audio</category>
+  </categories>
+  <keywords>
+    <keyword>record</keyword>
+    <keyword>recorder</keyword>
+    <keyword>call</keyword>
+    <keyword>meeting</keyword>
+    <keyword>transcript</keyword>
+    <keyword>transcribe</keyword>
+    <keyword>replay</keyword>
+    <keyword>microphone</keyword>
+  </keywords>
+  <supports>
+    <control>keyboard</control>
+    <control>pointing</control>
+  </supports>
+  <provides>
+    <binary>recallcraft</binary>
+    <binary>recallcraft-cli</binary>
+  </provides>
+  <content_rating type="oars-1.1"/>
+  <releases>
+    <release version="@VERSION@" date="@DATE@"/>
+  </releases>
+</component>

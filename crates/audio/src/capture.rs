@@ -27,15 +27,18 @@ pub enum Mic {
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Source {
     Mic(Mic),
-    /// What the computer plays, without RecallCraft's own sound.
+    /// What the computer plays, without RecallCraft's own sound (the default speaker's).
     System,
+    /// What one speaker plays, by its id: the one a call is played on when it isn't the default
+    /// (a headset), whose sound the default speaker's loopback doesn't have.
+    Speaker(String),
 }
 
 impl Source {
     pub fn stream(&self) -> Stream {
         match self {
             Source::Mic(_) => Stream::Mic,
-            Source::System => Stream::System,
+            Source::System | Source::Speaker(_) => Stream::System,
         }
     }
 }
@@ -89,7 +92,7 @@ impl Capture {
         let (s, src) = (shared.clone(), source.clone());
         let name = match source {
             Source::Mic(_) => "microphone",
-            Source::System => "computer sound",
+            Source::System | Source::Speaker(_) => "computer sound",
         };
         let thread = std::thread::Builder::new()
             .name(name.into())

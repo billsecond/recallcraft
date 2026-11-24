@@ -1,0 +1,97 @@
+# .deb and .rpm packages (nfpm: https://nfpm.goreleaser.com). Run by package.sh, which stages
+# the file tree, substitutes its path for ${STAGE} (nfpm doesn't expand env vars in `src`) and
+# exports VERSION, NFPM_ARCH and RECALLCRAFT_MAINTAINER.
+#
+#   nfpm package -f packaging/linux/nfpm.yaml -p deb -t dist/release/
+name: recallcraft
+arch: ${NFPM_ARCH}
+platform: linux
+version: ${VERSION}
+# semver: 0.2.0-rc.1 becomes 0.2.0~rc.1 in deb/rpm, so pre-releases sort before the release.
+version_schema: semver
+release: 1
+section: sound
+priority: optional
+maintainer: ${RECALLCRAFT_MAINTAINER}
+vendor: RecallCraft contributors
+homepage: https://github.com/billsecond/recallcraft
+license: MIT OR Apache-2.0
+description: |-
+  Keeps the last two days of what was said, and writes calls down
+  RecallCraft waits in the system tray and keeps recording the microphone,
+  compactly, for as long as you choose (48 hours by default); older sound is
+  thrown away. Speech is written down on this computer by Whisper, in a program
+  of its own. A window lists what was recorded, to replay, search and export
+  (WAV, Opus, text, Markdown, SubRip, WebVTT, JSON). Includes recallcraft-cli.
+  Nothing is sent anywhere: no account, no cloud, no telemetry.
+
+  On Linux RecallCraft records the microphone; recording what the computer
+  plays, and finding calls on their own, are not done here yet. It arranges to
+  start at sign-in, for the person running it, the first time it runs
+  (~/.config/autostart); a systemd user unit (recallcraft.service) is installed
+  as an alternative, not enabled. The tray icon uses the D-Bus
+  StatusNotifierItem protocol: KDE Plasma, Xfce, Cinnamon and MATE show it;
+  GNOME needs the AppIndicator extension.
+
+# The binaries link glibc, libgcc_s and ALSA (libasound, the microphone and playback) directly.
+# Windowing (X11/Wayland, xkbcommon) and the GPU (Vulkan, EGL/GL) are loaded at runtime, so they
+# are dependencies/recommendations here rather than ELF NEEDED entries. libxkbcommon-x11 is a
+# dependency, not a recommendation: on an X11 session a window can't start without it.
+# xdg-desktop-portal (and the desktop's portal backend) shows the folder dialogs.
+overrides:
+  deb:
+    depends:
+      - libc6 (>= 2.35)
+      - libgcc-s1
+      - libxkbcommon0
+      - libxkbcommon-x11-0
+      - libvulkan1 | libegl1
+      # The microphone and playback (ALSA; Ubuntu 24.04 and Debian 13 call it libasound2t64).
+      - libasound2t64 | libasound2
+    recommends:
+      - libwayland-client0
+      - libx11-6
+      - libx11-xcb1
+      - libxcursor1
+      - libxi6
+      - libxrandr2
+      - mesa-vulkan-drivers
+      - xdg-desktop-portal
+      # ALSA's default device through the desktop's sound server.
+      - pipewire-alsa | libasound2-plugins
+  rpm:
+    depends:
+      - libxkbcommon
+      - libxkbcommon-x11
+      - (vulkan-loader or libglvnd-egl)
+      - alsa-lib
+    recommends:
+      - libwayland-client
+      - libX11
+      - libXcursor
+      - libXi
+      - libXrandr
+      - mesa-vulkan-drivers
+      - xdg-desktop-portal
+      - (pipewire-alsa or alsa-plugins-pulseaudio)
+
+contents:
+  - src: ${STAGE}/usr/bin/recallcraft
+    dst: /usr/bin/recallcraft
+    file_info: { mode: 0755 }
+  - src: ${STAGE}/usr/bin/recallcraft-cli
+    dst: /usr/bin/recallcraft-cli
+    file_info: { mode: 0755 }
+  # The desktop entry, metainfo, icons, docs, the speech model (share/recallcraft/models) and the
+  # autostart entry to copy by hand (share/recallcraft/autostart).
+  - src: ${STAGE}/usr/share/
+    dst: /usr/share/
+    type: tree
+  # The systemd user unit: installed, not enabled.
+  - src: ${STAGE}/usr/lib/systemd/user/recallcraft.service
+    dst: /usr/lib/systemd/user/recallcraft.service
+    file_info: { mode: 0644 }
+
+scripts:
+  postinstall: packaging/linux/postinst.sh
+  postremove: packaging/linux/postinst.sh

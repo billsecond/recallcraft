@@ -7,7 +7,7 @@ use recallcraft_audio::devices::{self, Device};
 use recallcraft_desktop::service::{self as signin, Status as SignIn};
 use recallcraft_desktop::{models, paths, version};
 use recallcraft_model::settings::{MAX_KEEP_DAYS, MAX_KEEP_HOURS, MIN_KEEP_HOURS, SPEEDS};
-use recallcraft_model::{AudioExport, MicMode, Settings, TranscriptFormat};
+use recallcraft_model::{AudioExport, MicMode, RecordMode, Settings, TranscriptFormat};
 use recallcraft_store::Layout;
 
 use super::Action;
@@ -58,7 +58,17 @@ pub fn show(ui: &mut egui::Ui, s: &mut Settings, st: &mut State, layout: &Layout
         ui.label(RichText::new("What you say into the microphone is labelled with it.").small().weak());
 
         section(ui, "Recording");
-        ui.checkbox(&mut s.recording, "Record all the time");
+        ui.checkbox(&mut s.recording, "Recording is on").on_hover_text("Off is the same as the tray's Pause until I resume");
+        ui.radio_value(&mut s.record_mode, RecordMode::Always, "Record all the time (keeps the last hours, calls or not)");
+        ui.radio_value(&mut s.record_mode, RecordMode::CallsOnly, "Record only during calls");
+        ui.label(
+            RichText::new(
+                "Only during calls, the microphone and the computer's sound are opened when a call starts and closed when it ends, \
+                 so the first second or two of a call may be missed, and Replay has nothing outside calls.",
+            )
+            .small()
+            .weak(),
+        );
         ui.horizontal(|ui| {
             ui.label("Keep everything heard for");
             ui.add(egui::DragValue::new(&mut s.keep_audio_hours).range(MIN_KEEP_HOURS..=MAX_KEEP_HOURS).suffix(" hours"));
@@ -75,10 +85,12 @@ pub fn show(ui: &mut egui::Ui, s: &mut Settings, st: &mut State, layout: &Layout
             });
         });
         ui.label(RichText::new("Following the call records the microphone the calling app uses, and Windows' default one otherwise.").small().weak());
-        ui.label("Record the microphone");
-        ui.radio_value(&mut s.mic_mode, MicMode::Auto, "All the time, but a Bluetooth headset's only during calls (recommended)");
-        ui.radio_value(&mut s.mic_mode, MicMode::Always, "All the time");
-        ui.radio_value(&mut s.mic_mode, MicMode::DuringCalls, "Only during calls");
+        ui.add_enabled_ui(s.record_mode == RecordMode::Always, |ui| {
+            ui.label("Record the microphone");
+            ui.radio_value(&mut s.mic_mode, MicMode::Auto, "All the time, but a Bluetooth headset's only during calls (recommended)");
+            ui.radio_value(&mut s.mic_mode, MicMode::Always, "All the time");
+            ui.radio_value(&mut s.mic_mode, MicMode::DuringCalls, "Only during calls");
+        });
         ui.label(
             RichText::new("While any program records a Bluetooth headset's microphone, the headset switches to its hands-free mode and everything else it plays sounds worse.")
                 .small()
@@ -221,6 +233,14 @@ pub fn show(ui: &mut egui::Ui, s: &mut Settings, st: &mut State, layout: &Layout
             st.signin = Some(signin::status());
         }
         ui.label(RichText::new("It keeps the last hours only while it runs.").small().weak());
+        ui.label(
+            RichText::new("Closing this window keeps RecallCraft in the tray, recording; it stops only when you quit it (here, or in the tray's menu).")
+                .small()
+                .weak(),
+        );
+        if ui.button("Quit RecallCraft").on_hover_text("Stops recording and closes RecallCraft until you start it again").clicked() {
+            out.push(Action::Quit);
+        }
 
         section(ui, "About");
         ui.label(version::line("RecallCraft"));

@@ -9,7 +9,7 @@
 //!   ([`instance`]).
 //! - The settings file is looked at twice a second: the window changes it.
 
-use std::process::{Child, Command, ExitCode};
+use std::process::{Child, Command, ExitCode, Stdio};
 use std::time::{Duration, Instant, SystemTime};
 
 use global_hotkey::{GlobalHotKeyEvent, HotKeyState};
@@ -18,10 +18,10 @@ use recallcraft_desktop::icon::{self, Look};
 use recallcraft_desktop::{instance, logging, models, paths, service as signin, settings as prefs, version};
 use recallcraft_engine::worker::HearWith;
 use recallcraft_engine::{Config, Engine};
-use recallcraft_model::{Settings, time};
+use recallcraft_model::{RecordMode, Settings, time};
 use recallcraft_store::Layout;
 use recallcraft_store::ring::RingReader;
-use tray_icon::menu::{Menu, MenuEvent, MenuId, MenuItem, PredefinedMenuItem};
+use tray_icon::menu::{CheckMenuItem, Menu, MenuEvent, MenuId, MenuItem, PredefinedMenuItem};
 use tray_icon::{MouseButton, MouseButtonState, TrayIcon, TrayIconBuilder, TrayIconEvent};
 use winit::application::ApplicationHandler;
 use winit::event::{StartCause, WindowEvent};
@@ -47,6 +47,7 @@ struct Items {
     pause60: MenuItem,
     pause: MenuItem,
     resume: MenuItem,
+    calls_only: CheckMenuItem,
     settings: MenuItem,
     quit: MenuItem,
 }
@@ -88,6 +89,40 @@ fn hear_with() -> HearWith {
     }
 }
 
+/// Started by the owner while nothing runs: the service is started under the supervisor
+/// (`--background`), so it's started again if it ever stops unexpectedly and stays in the tray
+/// until Quit; this copy hands its arguments to it and ends. None when that isn't how it starts
+/// (runs without settings, or the supervisor can't be started): this copy is the service.
+fn start_supervised(handover: &[String]) -> Option<ExitCode> {
+    if paths::no_prefs() || instance::running("service") {
+        return None;
+    }
+    let exe = std::env::current_exe().ok()?;
+    let mut c = Command::new(&exe);
+    c.arg("--background").stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null());
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        // Its own, outliving this copy and any console it was started from.
+        const DETACHED_PROCESS: u32 = 0x0000_0008;
+        const CREATE_NEW_PROCESS_GROUP: u32 = 0x0000_0200;
+        c.creation_flags(DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP);
+    }
+    if let Err(e) = c.spawn() {
+        log::warn!("starting the supervisor: {e}; running the service here");
+        return None;
+    }
+    let deadline = Instant::now() + Duration::from_secs(20);
+    while Instant::now() < deadline {
+        if instance::tell("service", handover) {
+            return Some(ExitCode::SUCCESS);
+        }
+        std::thread::sleep(Duration::from_millis(200));
+    }
+    log::error!("the service didn't start in time");
+    Some(ExitCode::FAILURE)
+}
+
 pub fn run(args: &[String]) -> ExitCode {
     let by_system = args.iter().any(|a| a == "--tray");
     let handover: Vec<String> = if by_system {
@@ -97,6 +132,12 @@ pub fn run(args: &[String]) -> ExitCode {
     } else {
         args.to_vec()
     };
+    if !by_system
+        && !args.iter().any(|a| a == "--quit")
+        && let Some(code) = start_supervised(&handover)
+    {
+        return code;
+    }
     let guard = match instance::start("service", &handover) {
         instance::Start::First(g) => g,
         instance::Start::Handed => return ExitCode::SUCCESS,
@@ -197,6 +238,7 @@ impl ServiceApp {
             pause60: MenuItem::new("Pause for an hour", true, None),
             pause: MenuItem::new("Pause until I resume", true, None),
             resume: MenuItem::new("Resume recording", false, None),
+            calls_only: CheckMenuItem::new("Record only during calls", true, self.settings.record_mode == RecordMode::CallsOnly, None),
             settings: MenuItem::new("Settings…", true, None),
             quit: MenuItem::new("Quit RecallCraft", true, None),
         };
@@ -213,6 +255,7 @@ impl ServiceApp {
             menu.append(&items.pause),
             menu.append(&items.resume),
             menu.append(&sep()),
+            menu.append(&items.calls_only),
             menu.append(&items.settings),
             menu.append(&items.quit),
         ] {
@@ -385,13 +428,22 @@ impl ServiceApp {
             format!("Paused until {}", time::local_time(self.settings.paused_until_ms))
         } else if st.in_call() {
             format!("Recording · {} ({})", st.call_title, time::duration_words(now.saturating_sub(st.call_started_ms)))
-        } else if !st.problems.is_empty() {
-            format!("Recording · {}", st.problems.join("; "))
         } else if self.replay.is_some() {
             "Replaying…".to_string()
+        } else if self.settings.record_mode == RecordMode::CallsOnly {
+            "Waiting for a call (recording only during calls)".to_string()
+        } else if !st.problems.is_empty() {
+            format!("Recording · {}", st.problems.join("; "))
         } else {
             "Recording".to_string()
         };
+        if let Some(i) = &self.items {
+            // Kept as the settings say (the window can change them too).
+            let calls_only = self.settings.record_mode == RecordMode::CallsOnly;
+            if i.calls_only.is_checked() != calls_only {
+                i.calls_only.set_checked(calls_only);
+            }
+        }
         if text != self.status_text {
             if let Some(i) = &self.items {
                 i.status.set_text(&text);
@@ -412,8 +464,28 @@ impl ServiceApp {
         }
     }
 
+    /// Quit: the window goes too (it's told to, and ended if it doesn't within two seconds).
+    fn close_window(&mut self) {
+        if instance::running("window") {
+            instance::tell("window", &["--quit".to_string()]);
+        }
+        if let Some(mut c) = self.window.take() {
+            let deadline = Instant::now() + Duration::from_secs(2);
+            while Instant::now() < deadline && matches!(c.try_wait(), Ok(None)) {
+                std::thread::sleep(Duration::from_millis(50));
+            }
+            if matches!(c.try_wait(), Ok(None)) {
+                let _ = c.kill();
+                let _ = c.wait();
+            }
+        }
+    }
+
     fn shut_down(&mut self) {
         self.replay = None;
+        if self.quitting {
+            self.close_window();
+        }
         if let Some(e) = self.engine.take() {
             e.stop();
         }
@@ -448,6 +520,14 @@ impl ApplicationHandler<Msg> for ServiceApp {
             },
             Msg::Menu(id) => {
                 let Some(i) = &self.items else { return };
+                if *i.calls_only.id() == id {
+                    // The menu ticked or unticked it already.
+                    let mode = if i.calls_only.is_checked() { RecordMode::CallsOnly } else { RecordMode::Always };
+                    log::info!("{}", mode.label());
+                    self.change(|s| s.record_mode = mode);
+                    self.tick(el);
+                    return;
+                }
                 let which =
                     [(&i.open, 0), (&i.replay, 1), (&i.pause15, 2), (&i.pause60, 3), (&i.pause, 4), (&i.resume, 5), (&i.settings, 6), (&i.quit, 7)]
                         .iter()

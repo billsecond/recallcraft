@@ -1,6 +1,7 @@
 # The gates every change must pass (`cargo xtask ci`): formatting, clippy with warnings as
-# errors, the tests, and the crates' layering. Windows is where RecallCraft records both sides
-# of a call; Linux and macOS build the microphone-only parts.
+# errors, the tests, asset attribution, no product names, and the crates' layering, on the three
+# desktop systems. Windows is where RecallCraft records both sides of a call; Linux and macOS
+# build the microphone-only parts.
 name: CI
 
 on:
@@ -29,6 +30,8 @@ jobs:
         with:
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
+      # Windowing and sound headers the programs link against. Everything else on Linux (X11
+      # through x11rb, D-Bus through zbus, the tray through ksni) is Rust.
       - name: Linux build dependencies
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y libxkbcommon-dev libwayland-dev libgtk-3-dev libasound2-dev libxdo-dev

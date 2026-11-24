@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Hardened-runtime entitlements for RecallCraft.app and the CLI. They are pure Rust, load no
+     unsigned code, need no JIT, and are not sandboxed (the recording lives in the owner's
+     Application Support folder or one they choose, and exports go where they say). Add exceptions
+     here only with a reason in a comment. -->
+<plist version="1.0">
+<dict>
+  <!-- The microphone: what RecallCraft records (macOS still asks the owner the first time, with
+       NSMicrophoneUsageDescription; without this the hardened runtime refuses silently). -->
+  <key>com.apple.security.device.audio-input</key>
+  <true/>
+</dict>
+</plist>
