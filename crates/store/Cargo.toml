@@ -1,0 +1,18 @@
+[package]
+name = "recallcraft-store"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+description = "RecallCraft's files: the recording (Opus packets in five-minute files), the calls and their transcripts, what is kept and for how long, and exports"
+
+[lints]
+workspace = true
+
+[dependencies]
+recallcraft-model = { workspace = true }
+rusty-opus = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+log = { workspace = true }
+thiserror = { workspace = true }

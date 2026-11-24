@@ -1,0 +1,23 @@
+[package]
+name = "recallcraft-audio"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+description = "RecallCraft's sound devices: the microphone and what the computer plays, as timed blocks, and playback at any speed"
+
+[lints]
+workspace = true
+
+[dependencies]
+recallcraft-model = { workspace = true }
+recallcraft-store = { workspace = true }
+log = { workspace = true }
+thiserror = { workspace = true }
+# Playback everywhere, and the microphone outside Windows.
+cpal = { workspace = true }
+
+# Windows: WASAPI, for the microphone a call uses and for what the computer plays, through a
+# loopback that leaves RecallCraft's own sound (its replays) out.
+[target.'cfg(target_os = "windows")'.dependencies]
+wasapi = { workspace = true }

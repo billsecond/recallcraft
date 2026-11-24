@@ -1,0 +1,32 @@
+[package]
+name = "recallcraft"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+description = "RecallCraft: keeps the last two days of what was said, finds your calls and writes them down as they happen"
+build = "build.rs"
+
+[lints]
+workspace = true
+
+[dependencies]
+recallcraft-model = { workspace = true }
+recallcraft-store = { workspace = true }
+recallcraft-audio = { workspace = true }
+recallcraft-engine = { workspace = true }
+recallcraft-desktop = { workspace = true }
+eframe = { workspace = true, features = ["default_fonts", "wgpu", "accesskit", "wayland", "x11"] }
+egui = { workspace = true }
+rfd = { workspace = true }
+tray-icon = { workspace = true }
+global-hotkey = { workspace = true }
+winit = { workspace = true }
+opener = { workspace = true }
+pollster = "0.4"
+log = { workspace = true }
+serde_json = { workspace = true }
+
+[build-dependencies]
+# Icon + version info for the .exe; build.rs only uses it when the target is Windows.
+winresource = "0.1"

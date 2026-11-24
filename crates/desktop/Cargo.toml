@@ -1,0 +1,23 @@
+[package]
+name = "recallcraft-desktop"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+description = "What RecallCraft's programs share: where things are kept, the settings file, the log, one running copy, starting at sign-in and the supervisor that keeps the service running, the speech model's file, the icon"
+
+[lints]
+workspace = true
+
+[dependencies]
+recallcraft-model = { workspace = true }
+recallcraft-store = { workspace = true }
+serde_json = { workspace = true }
+log = { workspace = true }
+getrandom = { workspace = true }
+dirs = { workspace = true }
+jiff = { workspace = true }
+
+[target.'cfg(target_os = "windows")'.dependencies]
+# The sign-in entry (Run, StartupApproved) is in the registry.
+winreg = { workspace = true }

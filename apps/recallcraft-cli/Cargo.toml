@@ -1,0 +1,23 @@
+[package]
+name = "recallcraft-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+description = "RecallCraft for scripts and agents: the calls, their transcripts, exports and search, from the command line"
+
+[[bin]]
+name = "recallcraft-cli"
+path = "src/main.rs"
+
+[lints]
+workspace = true
+
+[dependencies]
+recallcraft-model = { workspace = true }
+recallcraft-store = { workspace = true }
+recallcraft-speech = { workspace = true }
+recallcraft-engine = { workspace = true }
+recallcraft-desktop = { workspace = true }
+serde_json = { workspace = true }
+log = { workspace = true }

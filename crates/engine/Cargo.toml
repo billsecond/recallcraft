@@ -1,0 +1,22 @@
+[package]
+name = "recallcraft-engine"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+description = "RecallCraft's recorder: the devices kept recording, calls found, their transcripts written as they're said"
+
+[lints]
+workspace = true
+
+[dependencies]
+recallcraft-model = { workspace = true }
+recallcraft-store = { workspace = true }
+recallcraft-speech = { workspace = true }
+recallcraft-audio = { workspace = true }
+recallcraft-calls = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+log = { workspace = true }
+
+[dev-dependencies]
