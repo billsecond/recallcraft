@@ -1,0 +1,262 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  RecallCraft MSI (WiX Toolset v5: `dotnet tool install -g wix`, plus its UI and Util extensions:
+  `wix extension add -g WixToolset.UI.wixext/5.0.2` and the same for WixToolset.Util.wixext).
+  Built by package.ps1:
+
+    wix build recallcraft.wxs -arch x64 -ext WixToolset.UI.wixext -ext WixToolset.Util.wixext
+      -d Version=1.2.3 -d BinDir=... -d IconPath=... -d LicenseRtf=... -o out.msi
+
+  The program (recallcraft.exe: the service, its window and the worker that writes speech down),
+  the command-line program (recallcraft-cli.exe) and the speech model in models\ beside them, with
+  a Start Menu shortcut for the program. It starts at sign-in for the person who installs it (the
+  Run value below). The installer shows the standard WiX look: the license with the choice of who
+  it's for, progress, and a finish page.
+
+  One package, two ways to install it (a "dual-purpose" package, Windows Installer 5.0):
+  - for everyone on this PC (per-machine): Program Files\RecallCraft, the all-users Start menu,
+    HKLM. An administrator has to allow it (UAC). This is the default: `msiexec /i x.msi`,
+    `/passive` and `/qn` all install per-machine.
+  - just for me (per-user): %LocalAppData%\Programs\RecallCraft, my own Start menu, HKCU. No
+    administrator. The installer's first page offers it; on the command line it is
+    `msiexec /i x.msi ALLUSERS=2 MSIINSTALLPERUSER=1` (both: the package's own ALLUSERS is 1, and
+    Windows reads MSIINSTALLPERUSER only when ALLUSERS is 2).
+  The files go under ProgramFiles6432Folder, which Windows points at %LocalAppData%\Programs for a
+  per-user install, and the App Paths value is HKMU, which is HKLM per-machine and HKCU per-user.
+  An install keeps its scope: Windows upgrades only a product installed the same way, so the first
+  page offers only the earlier install's scope when there is one, and a silent install in the
+  other scope stops with a message.
+
+  Starting at sign-in is always per person (HKCU), in both scopes, unlike ScreenGrabCraft's
+  installer: RecallCraft records the microphone and what the computer plays, so it must never
+  start recording for somebody on this PC who hasn't started it themselves; and its own "Start
+  RecallCraft when I sign in" switch (crates/desktop/src/service.rs) reads and removes exactly that
+  HKCU value, so an HKLM one would bring it back after the owner turned it off. Anyone else on the
+  PC gets the same entry the first time they start RecallCraft (the program arranges it on its
+  first run, and the advertised shortcut writes this package's per-user part for them).
+
+  UpgradeCode and the component GUIDs below belong to RecallCraft alone. Never copy them from (or
+  into) a sibling Craft app: Windows Installer treats every package sharing an UpgradeCode as one
+  product, so a shared code makes one app's installer refuse to install ("a newer version is
+  already installed") or silently uninstall the other. packaging-lint.yml checks this file has no
+  GUID twice.
+-->
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+    xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui"
+    xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
+  <Package
+      Name="RecallCraft"
+      Manufacturer="RecallCraft contributors"
+      Version="$(var.Version)"
+      UpgradeCode="6A0048D5-E5B6-4588-940F-668CA198836D"
+      Scope="perMachine"
+      Compressed="yes"
+      Language="1033">
+    <SummaryInformation Description="RecallCraft keeps the last two days of what was said and writes calls down" Manufacturer="RecallCraft contributors" />
+    <!-- Same-version upgrades let successive pre-releases of one X.Y.Z replace each other
+         (MSI versions are numeric, so 1.2.3-rc.1 and 1.2.3-rc.2 are both 1.2.3). -->
+    <MajorUpgrade AllowSameVersionUpgrades="yes"
+        DowngradeErrorMessage="A newer version of RecallCraft is already installed." />
+    <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
+
+    <Icon Id="RecallCraftIcon.ico" SourceFile="$(var.IconPath)" />
+    <Property Id="ARPPRODUCTICON" Value="RecallCraftIcon.ico" />
+    <Property Id="ARPURLINFOABOUT" Value="https://github.com/billsecond/recallcraft" />
+    <Property Id="ARPURLUPDATEINFO" Value="https://github.com/billsecond/recallcraft/releases" />
+    <Property Id="ARPHELPLINK" Value="https://github.com/billsecond/recallcraft/issues" />
+
+    <!-- The service runs all the time (tray icon, the recorder, the replay shortcut):
+         recallcraft.exe started with its background flag (the Run value below; XML comments
+         can't spell the flag's double hyphen) is a small supervisor that runs the service and
+         restarts it if it exits abnormally; the service starts its window and the worker that
+         writes speech down as copies of the same program. An upgrade or an uninstall must close
+         them all, or their files stay in use and Windows asks for a reboot. WixCloseApplications
+         (Util extension, before InstallValidate) sends WM_CLOSE to the windows of every
+         recallcraft.exe, on which the window closes; whatever is still running after the timeout
+         (the service, whose windows are hidden, the worker and the windowless supervisor) is
+         terminated, with exit code 0 so a supervisor that is still there sees a normal end and
+         doesn't restart the service. The recording loses at most its last second (it's flushed
+         every second). Never a reboot prompt. Only when the program is already installed (repair,
+         uninstall) or an older version is being replaced: a first install leaves a portable copy
+         alone.
+         The Util extension sequences this before InstallFiles, which on an uninstall comes after
+         RemoveFiles: the terminating half (a deferred action) would then run after the files it
+         holds were due to go, and the uninstall would need a reboot. It is moved to the start of
+         the install script instead, ahead of every removal. (It can't go before InstallInitialize:
+         it schedules a deferred action.) -->
+    <util:CloseApplication Id="CloseRecallCraft" Target="recallcraft.exe"
+        CloseMessage="yes" TerminateProcess="0" RebootPrompt="no"
+        Condition="Installed OR WIX_UPGRADE_DETECTED" />
+    <InstallExecuteSequence>
+      <Custom Action="override Wix4CloseApplications_$(sys.BUILDARCHSHORT)" After="InstallInitialize"
+          Condition="VersionNT &gt; 400" />
+    </InstallExecuteSequence>
+
+    <!-- An earlier RecallCraft, and how it was installed: the program's App Paths entry, in HKLM
+         for everyone on this PC, in HKCU for this person alone. (The registry view is the
+         package's own, so an x64 package reads the 64-bit HKLM, where its earlier versions
+         wrote.) -->
+    <Property Id="RC_MACHINE_INSTALL" Secure="yes">
+      <RegistrySearch Id="EarlierMachineInstall" Root="HKLM" Key="Software\Microsoft\Windows\CurrentVersion\App Paths\recallcraft.exe" Type="raw" />
+    </Property>
+    <Property Id="RC_USER_INSTALL" Secure="yes">
+      <RegistrySearch Id="EarlierUserInstall" Root="HKCU" Key="Software\Microsoft\Windows\CurrentVersion\App Paths\recallcraft.exe" Type="raw" />
+    </Property>
+
+    <!-- An install in the other scope than the earlier one would not replace it (Windows upgrades
+         only a product installed the same way) but sit beside it. A silent install that would do
+         that stops instead. The context is per-user when ALLUSERS is empty, or still 2 with
+         MSIINSTALLPERUSER set (Windows resets ALLUSERS=2 to 1 or empty as it decides). -->
+    <CustomAction Id="InstalledForEveryone" Error="RecallCraft is installed for everyone on this PC, so this version can only be installed for everyone too (leave out ALLUSERS=2 MSIINSTALLPERUSER=1). To have it just for you, uninstall it first." />
+    <CustomAction Id="InstalledJustForYou" Error="RecallCraft is installed just for you, so this version can only be installed just for you too (msiexec /i with ALLUSERS=2 MSIINSTALLPERUSER=1). To have it for everyone on this PC, uninstall it first." />
+    <InstallExecuteSequence>
+      <Custom Action="InstalledForEveryone" After="AppSearch"
+          Condition="NOT Installed AND RC_MACHINE_INSTALL AND (NOT ALLUSERS OR (ALLUSERS = 2 AND MSIINSTALLPERUSER = 1))" />
+      <Custom Action="InstalledJustForYou" After="InstalledForEveryone"
+          Condition="NOT Installed AND RC_USER_INSTALL AND NOT RC_MACHINE_INSTALL AND NOT (NOT ALLUSERS OR (ALLUSERS = 2 AND MSIINSTALLPERUSER = 1))" />
+    </InstallExecuteSequence>
+
+    <!-- With the full UI, Windows looks for the version to replace (FindRelatedProducts) in the UI
+         process, once, in the context it starts in: per-machine, the package's default. When the
+         earlier install is per-user (and there is no per-machine one, which then wins), that
+         context is switched to per-user first, so the earlier version is found and replaced; the
+         first page then offers only "Just for me". AppSearch runs first to know. (ALLUSERS is
+         emptied through a property that is never set: an empty ALLUSERS is per-user.) -->
+    <CustomAction Id="LookForTheEarlierUserInstall" Property="ALLUSERS" Value="[RC_NO_VALUE]" Execute="immediate" />
+    <InstallUISequence>
+      <AppSearch Sequence="22" />
+      <Custom Action="LookForTheEarlierUserInstall" Sequence="23"
+          Condition="NOT Installed AND RC_USER_INSTALL AND NOT RC_MACHINE_INSTALL" />
+    </InstallUISequence>
+
+    <!-- Installer UI: WixUI_Minimal (progress, the finish page, repair and remove), with its first
+         page (the license, whose Install button installs) replaced by the same page with two
+         buttons, "Just for me" and "Everyone on this PC", which also decide the scope. Its
+         dialogs and bitmaps are WiX's own (WixToolset.UI.wixext); package.ps1 builds the license
+         RTF from LICENSE-MIT, LICENSE-APACHE and the speech model's licence.
+         "Just for me" sets ALLUSERS=2 and MSIINSTALLPERUSER=1 (as Microsoft's dual-purpose sample
+         does) and points INSTALLFOLDER at %LocalAppData%\Programs\RecallCraft, where Windows puts
+         a per-user install's ProgramFiles6432Folder: the UI process resolved its folders
+         per-machine, and its INSTALLFOLDER is the one handed to the install and the one the finish
+         page launches from. "Everyone on this PC" (with the administrator shield) sets ALLUSERS=1.
+         When an earlier version is installed, only its scope's button is enabled.
+         The finish page offers to start RecallCraft (ticked by default) the way a sign-in does
+         (the same command line as the Run value), from the installer's UI process (as the person
+         installing, not from the elevated install service), without waiting for it; silent
+         installs (/qn) never show it, and RecallCraft then starts at the next sign-in. -->
+    <WixVariable Id="WixUILicenseRtf" Value="$(var.LicenseRtf)" />
+    <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT" Value="Start RecallCraft" />
+    <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOX" Value="1" />
+    <CustomAction Id="LaunchRecallCraft" FileRef="RecallCraftExe" ExeCommand="--background"
+        Return="asyncNoWait" />
+    <UI>
+      <ui:WixUI Id="WixUI_Minimal" />
+      <Publish Dialog="ExitDialog" Control="Finish" Event="DoAction" Value="LaunchRecallCraft"
+          Condition="WIXUI_EXITDIALOGOPTIONALCHECKBOX = 1 AND NOT Installed" />
+
+      <Dialog Id="ScopeEulaDlg" Width="370" Height="270" Title="!(loc.WelcomeEulaDlg_Title)">
+        <Control Id="Bitmap" Type="Bitmap" X="0" Y="0" Width="370" Height="234" TabSkip="no" Text="!(loc.WelcomeEulaDlgBitmap)" />
+        <Control Id="Title" Type="Text" X="130" Y="6" Width="225" Height="30" Transparent="yes" NoPrefix="yes" Text="!(loc.WelcomeEulaDlgTitle)" />
+        <Control Id="LicenseText" Type="ScrollableText" X="130" Y="36" Width="226" Height="124" Sunken="yes" TabSkip="no">
+          <Text SourceFile="!(wix.WixUILicenseRtf)" />
+        </Control>
+        <Control Id="LicenseAcceptedCheckBox" Type="CheckBox" X="130" Y="164" Width="226" Height="18" CheckBoxValue="1" Property="RcLicenseAccepted" Text="!(loc.WelcomeEulaDlgLicenseAcceptedCheckBox)" />
+        <Control Id="ChoiceText" Type="Text" X="130" Y="188" Width="226" Height="40" Transparent="yes" NoPrefix="yes" Hidden="yes"
+            ShowCondition="NOT RC_MACHINE_INSTALL AND NOT RC_USER_INSTALL"
+            Text="Who is it for? Just for you needs no administrator and installs in your own folders. Everyone on this PC needs an administrator's permission." />
+        <Control Id="MachineText" Type="Text" X="130" Y="188" Width="226" Height="40" Transparent="yes" NoPrefix="yes" Hidden="yes"
+            ShowCondition="RC_MACHINE_INSTALL"
+            Text="RecallCraft is installed for everyone on this PC, so this version replaces it there. Windows asks for an administrator's permission." />
+        <Control Id="UserText" Type="Text" X="130" Y="188" Width="226" Height="40" Transparent="yes" NoPrefix="yes" Hidden="yes"
+            ShowCondition="RC_USER_INSTALL AND NOT RC_MACHINE_INSTALL"
+            Text="RecallCraft is installed just for you, so this version replaces it there. No administrator is needed." />
+        <Control Id="BottomLine" Type="Line" X="0" Y="234" Width="370" Height="0" />
+        <Control Id="JustForMe" Type="PushButton" X="114" Y="243" Width="76" Height="17" Text="Just for &amp;me"
+            DisableCondition="RcLicenseAccepted &lt;&gt; &quot;1&quot; OR RC_MACHINE_INSTALL"
+            EnableCondition="RcLicenseAccepted = &quot;1&quot; AND NOT RC_MACHINE_INSTALL">
+          <Publish Property="ALLUSERS" Value="2" Order="1" />
+          <Publish Property="MSIINSTALLPERUSER" Value="1" Order="2" />
+          <Publish Property="INSTALLFOLDER" Value="[LocalAppDataFolder]Programs\RecallCraft\" Order="3" />
+          <Publish Event="SetTargetPath" Value="INSTALLFOLDER" Order="4" />
+          <Publish Event="SpawnWaitDialog" Value="WaitForCostingDlg" Order="5" Condition="!(wix.WixUICostingPopupOptOut) OR CostingComplete = 1" />
+          <Publish Event="EndDialog" Value="Return" Order="6" Condition="OutOfDiskSpace &lt;&gt; 1" />
+          <Publish Event="SpawnDialog" Value="OutOfRbDiskDlg" Order="7" Condition="OutOfDiskSpace = 1 AND OutOfNoRbDiskSpace = 0 AND (PROMPTROLLBACKCOST=&quot;P&quot; OR NOT PROMPTROLLBACKCOST)" />
+          <Publish Event="EndDialog" Value="Return" Order="8" Condition="OutOfDiskSpace = 1 AND OutOfNoRbDiskSpace = 0 AND PROMPTROLLBACKCOST=&quot;D&quot;" />
+          <Publish Event="EnableRollback" Value="False" Order="9" Condition="OutOfDiskSpace = 1 AND OutOfNoRbDiskSpace = 0 AND PROMPTROLLBACKCOST=&quot;D&quot;" />
+          <Publish Event="SpawnDialog" Value="OutOfDiskDlg" Order="10" Condition="(OutOfDiskSpace = 1 AND OutOfNoRbDiskSpace = 1) OR (OutOfDiskSpace = 1 AND PROMPTROLLBACKCOST=&quot;F&quot;)" />
+        </Control>
+        <Control Id="Everyone" Type="PushButton" ElevationShield="yes" X="196" Y="243" Width="102" Height="17" Default="yes" Text="&amp;Everyone on this PC"
+            DisableCondition="RcLicenseAccepted &lt;&gt; &quot;1&quot; OR (RC_USER_INSTALL AND NOT RC_MACHINE_INSTALL)"
+            EnableCondition="RcLicenseAccepted = &quot;1&quot; AND (RC_MACHINE_INSTALL OR NOT RC_USER_INSTALL)">
+          <Publish Property="ALLUSERS" Value="1" Order="1" />
+          <Publish Event="SpawnWaitDialog" Value="WaitForCostingDlg" Order="2" Condition="!(wix.WixUICostingPopupOptOut) OR CostingComplete = 1" />
+          <Publish Event="EndDialog" Value="Return" Order="3" Condition="OutOfDiskSpace &lt;&gt; 1" />
+          <Publish Event="SpawnDialog" Value="OutOfRbDiskDlg" Order="4" Condition="OutOfDiskSpace = 1 AND OutOfNoRbDiskSpace = 0 AND (PROMPTROLLBACKCOST=&quot;P&quot; OR NOT PROMPTROLLBACKCOST)" />
+          <Publish Event="EndDialog" Value="Return" Order="5" Condition="OutOfDiskSpace = 1 AND OutOfNoRbDiskSpace = 0 AND PROMPTROLLBACKCOST=&quot;D&quot;" />
+          <Publish Event="EnableRollback" Value="False" Order="6" Condition="OutOfDiskSpace = 1 AND OutOfNoRbDiskSpace = 0 AND PROMPTROLLBACKCOST=&quot;D&quot;" />
+          <Publish Event="SpawnDialog" Value="OutOfDiskDlg" Order="7" Condition="(OutOfDiskSpace = 1 AND OutOfNoRbDiskSpace = 1) OR (OutOfDiskSpace = 1 AND PROMPTROLLBACKCOST=&quot;F&quot;)" />
+        </Control>
+        <Control Id="Cancel" Type="PushButton" X="304" Y="243" Width="56" Height="17" Cancel="yes" Text="!(loc.WixUICancel)">
+          <Publish Event="SpawnDialog" Value="CancelDlg" />
+        </Control>
+      </Dialog>
+    </UI>
+    <InstallUISequence>
+      <Show Dialog="override WelcomeEulaDlg" Before="ProgressDlg" Condition="0" />
+      <Show Dialog="ScopeEulaDlg" Before="ProgressDlg" Condition="NOT Installed" />
+    </InstallUISequence>
+
+    <StandardDirectory Id="ProgramFiles6432Folder">
+      <Directory Id="INSTALLFOLDER" Name="RecallCraft">
+        <Directory Id="MODELSFOLDER" Name="models" />
+      </Directory>
+    </StandardDirectory>
+    <StandardDirectory Id="ProgramMenuFolder" />
+
+    <Feature Id="Main" Title="RecallCraft" Level="1">
+      <ComponentGroupRef Id="RecallCraftFiles" />
+    </Feature>
+  </Package>
+
+  <Fragment>
+    <ComponentGroup Id="RecallCraftFiles" Directory="INSTALLFOLDER">
+      <!-- The program. Its shortcut starts it and opens its window, or opens the window of the
+           one running. -->
+      <Component Id="RecallCraftApp" Guid="838503DE-E263-4CA5-A848-AEB7F2BADEBD">
+        <File Id="RecallCraftExe" Source="$(var.BinDir)\recallcraft.exe" KeyPath="yes">
+          <Shortcut Id="StartMenuShortcut" Directory="ProgramMenuFolder" Name="RecallCraft"
+              Description="Browse, replay and export what was said on your calls" WorkingDirectory="INSTALLFOLDER"
+              Advertise="yes" Icon="RecallCraftIcon.ico" IconIndex="0" />
+        </File>
+        <RegistryValue Root="HKMU" Key="Software\Microsoft\Windows\CurrentVersion\App Paths\recallcraft.exe" Value="[#RecallCraftExe]" Type="string" />
+      </Component>
+
+      <!-- Started at every sign-in, for the person who installs it (HKCU in both scopes; see the
+           top of this file): the same value the program writes itself when it first runs, and
+           the one its own "Start RecallCraft when I sign in" switch turns off, by removing it. So
+           the Run value is not this component's key path: Windows would repair a missing key path
+           back (from the advertised shortcut), and the owner's switch would turn itself on again.
+           The key path is a value of the installer's own that nothing else touches. Each person
+           can also turn it off in Task Manager › Startup apps (StartupApproved, which the program
+           reads). Both are removed on uninstall. -->
+      <Component Id="StartAtSignIn" Guid="2F22BD12-4539-4BC4-BABB-F43F3BC10532">
+        <RegistryValue Root="HKCU" Key="Software\RecallCraft\Installer" Name="StartAtSignIn" Value="1" Type="integer" KeyPath="yes" />
+        <RegistryValue Root="HKCU" Key="Software\Microsoft\Windows\CurrentVersion\Run" Name="RecallCraft"
+            Value="&quot;[INSTALLFOLDER]recallcraft.exe&quot; --background" Type="string" />
+      </Component>
+
+      <Component Id="RecallCraftCli">
+        <File Id="RecallCraftCliExe" Source="$(var.BinDir)\recallcraft-cli.exe" KeyPath="yes" />
+      </Component>
+
+      <!-- The speech model that writes calls down (Whisper base.en, OpenAI, MIT; see
+           assets/models/README.md), its licence and its readme, in models\ beside the programs,
+           where they look for it. -->
+      <Component Id="SpeechModel" Directory="MODELSFOLDER" Guid="544FEAB1-64DE-4D20-97CF-0EAF87692C55">
+        <File Id="SpeechModelFile" Source="$(var.BinDir)\models\whisper-base.en-q8_0.gguf" KeyPath="yes" />
+        <File Id="SpeechModelLicence" Source="$(var.BinDir)\models\LICENSE-WHISPER.txt" />
+        <File Id="SpeechModelReadme" Source="$(var.BinDir)\models\README.md" />
+      </Component>
+    </ComponentGroup>
+  </Fragment>
+</Wix>

@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- RecallCraft.app: the service, its window and its worker (one program). Template:
+     packaging/macos/package.sh substitutes @VERSION@ (full, e.g. 0.2.0-rc.1), @SHORT_VERSION@
+     (numeric X.Y.Z) and @BUILD_SHA@. -->
+<plist version="1.0">
+<dict>
+  <key>CFBundleDevelopmentRegion</key>
+  <string>en</string>
+  <key>CFBundleDisplayName</key>
+  <string>RecallCraft</string>
+  <key>CFBundleName</key>
+  <string>RecallCraft</string>
+  <key>CFBundleExecutable</key>
+  <string>RecallCraft</string>
+  <key>CFBundleIdentifier</key>
+  <string>io.github.billsecond.recallcraft</string>
+  <key>CFBundleInfoDictionaryVersion</key>
+  <string>6.0</string>
+  <key>CFBundlePackageType</key>
+  <string>APPL</string>
+  <key>CFBundleSignature</key>
+  <string>????</string>
+  <key>CFBundleShortVersionString</key>
+  <string>@SHORT_VERSION@</string>
+  <key>CFBundleVersion</key>
+  <string>@SHORT_VERSION@</string>
+  <key>RecallCraftVersion</key>
+  <string>@VERSION@</string>
+  <key>RecallCraftBuildCommit</key>
+  <string>@BUILD_SHA@</string>
+  <key>CFBundleIconFile</key>
+  <string>RecallCraft</string>
+  <key>LSApplicationCategoryType</key>
+  <string>public.app-category.productivity</string>
+  <!-- A menu-bar app: no Dock icon and no main menu of its own. It keeps running (a LaunchAgent
+       it registers on first run starts it at sign-in and restarts it). -->
+  <key>LSUIElement</key>
+  <true/>
+  <!-- Must match MACOSX_DEPLOYMENT_TARGET in package.sh. -->
+  <key>LSMinimumSystemVersion</key>
+  <string>11.0</string>
+  <key>NSHighResolutionCapable</key>
+  <true/>
+  <key>NSSupportsAutomaticGraphicsSwitching</key>
+  <true/>
+  <key>NSRequiresAquaSystemAppearance</key>
+  <false/>
+  <!-- What macOS shows when it asks the owner, the first time RecallCraft records. -->
+  <key>NSMicrophoneUsageDescription</key>
+  <string>RecallCraft keeps the last hours of what you say into your microphone, and writes your calls down, on this Mac. Nothing is sent anywhere.</string>
+  <key>NSHumanReadableCopyright</key>
+  <string>Copyright © the RecallCraft contributors. MIT OR Apache-2.0.</string>
+</dict>
+</plist>

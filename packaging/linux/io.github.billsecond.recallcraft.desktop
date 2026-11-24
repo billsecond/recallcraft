@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Name=RecallCraft
+GenericName=Call Recorder
+Comment=Keep the last two days of what was said, and write calls down
+Exec=recallcraft
+TryExec=recallcraft
+Icon=io.github.billsecond.recallcraft
+Terminal=false
+StartupNotify=false
+StartupWMClass=io.github.billsecond.recallcraft
+Categories=AudioVideo;Audio;Recorder;
+Keywords=record;recorder;call;meeting;transcript;transcribe;replay;microphone;speech;notes;

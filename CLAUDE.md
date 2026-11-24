@@ -46,9 +46,28 @@ It runs all the time; a crash loses what was being said.
   processes: the process loopback leaves the service's process tree out of the recording.
 - The window only reads what the service writes, plus the settings and owner edits to a call.
 
+## Assets
+Every asset is original (drawn in code, like the icon: `crates/desktop/src/icon.rs`), public domain,
+or under a licence that allows redistribution, and **every asset file has a row in
+[`ATTRIBUTION.md`](ATTRIBUTION.md)** (author, source, licence); `cargo xtask assets` fails otherwise.
+`cargo xtask icon` writes the icon's files for the packages (`assets/app-icon/`).
+
+## No product names
+Never name the commercial meeting recorders and notetakers RecallCraft is modelled on, or their
+makers, anywhere in the repository (code, comments, tests, strings, docs, file names), nor in
+commit messages and pull requests: say what a feature does instead. `cargo xtask names` fails if
+one appears; it keeps only the words' hashes, and `cargo xtask names hash <word>` prints the line
+to add for another. The calling apps RecallCraft finds calls in (Teams, Zoom, Slack, Webex,
+Discord, WhatsApp, …) are named on purpose and are never on that list.
+
 ## Quality gates
-Before every commit: `cargo xtask ci` (fmt, clippy -D warnings, tests, layers). Commit after every
-arc of work that builds, with a task id (`M1.2: …`).
+Before every commit: `cargo xtask ci` (fmt, clippy -D warnings, tests, assets, names, layers).
+Commit after every arc of work that builds, with a task id (`M1.2: …`).
+
+## Releasing
+`docs/releasing.md`: `cargo xtask version set X.Y.Z`, tag `vX.Y.Z`, and `.github/workflows/release.yml`
+builds every package with `packaging/` (each one carries the speech model where the programs look
+for it) and publishes one release.
 
 ## Running
 - `cargo run --release -p recallcraft` (the service and the window); `RECALLCRAFT_NO_PREFS=1`

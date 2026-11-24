@@ -1,0 +1,76 @@
+# Flatpak manifest for RecallCraft, ready for a Flathub submission.
+#
+# Flatpak builds run offline, so the crate sources must be vendored first. From the repo root:
+#
+#   curl -fsSLO https://raw.githubusercontent.com/flatpak/flatpak-builder-tools/master/cargo/flatpak-cargo-generator.py
+#   python3 flatpak-cargo-generator.py Cargo.lock -o packaging/linux/flatpak/cargo-sources.json
+#   flatpak-builder --user --install --force-clean build-flatpak packaging/linux/flatpak/io.github.billsecond.recallcraft.yml
+#   flatpak run io.github.billsecond.recallcraft
+#
+# One Flatpak holds both programs: `flatpak run io.github.billsecond.recallcraft` starts
+# RecallCraft (the service and its window); recallcraft-cli runs in the same sandbox. Starting at
+# sign-in isn't arranged for the Flatpak yet (it needs the Background portal), so no autostart
+# file is installed here.
+#
+# For Flathub, replace the `dir` source with a `git` source pinned to a release tag and commit.
+# The release's .flatpak bundles come from io.github.billsecond.recallcraft.bundle.yml instead (see
+# there); keep runtime, runtime-version, sdk and finish-args identical in both (packaging-lint
+# checks this).
+id: io.github.billsecond.recallcraft
+runtime: org.freedesktop.Platform
+runtime-version: '25.08'
+sdk: org.freedesktop.Sdk
+sdk-extensions:
+  - org.freedesktop.Sdk.Extension.rust-stable
+command: recallcraft
+finish-args:
+  # Display: Wayland first; X11 only when no Wayland compositor is running.
+  - --socket=wayland
+  - --socket=fallback-x11
+  # X11 shared memory (MIT-SHM). Without it the X11 fallback is slow or fails.
+  - --share=ipc
+  # GPU access for the window's renderer.
+  - --device=dri
+  # Sound: the microphone it records, and replaying what was recorded.
+  - --socket=pulseaudio
+  # Exports go to Documents/RecallCraft unless the settings say otherwise; other folders are
+  # chosen through the file-chooser portal.
+  - --filesystem=xdg-documents
+  # The tray icon (D-Bus StatusNotifierItem): talk to the desktop's StatusNotifierWatcher.
+  - --talk-name=org.kde.StatusNotifierWatcher
+  # Deliberately not granted: network (RecallCraft has no network features), home/host
+  # filesystem access.
+build-options:
+  append-path: /usr/lib/sdk/rust-stable/bin
+modules:
+  - name: recallcraft
+    buildsystem: simple
+    build-options:
+      env:
+        CARGO_HOME: /run/build/recallcraft/cargo
+        CARGO_NET_OFFLINE: 'true'
+    build-commands:
+      - cargo --offline build --release --locked -p recallcraft -p recallcraft-cli
+      - install -Dm755 target/release/recallcraft /app/bin/recallcraft
+      - install -Dm755 target/release/recallcraft-cli /app/bin/recallcraft-cli
+      - install -Dm644 packaging/linux/io.github.billsecond.recallcraft.desktop /app/share/applications/io.github.billsecond.recallcraft.desktop
+      - mkdir -p /app/share/icons && cp -R assets/app-icon/hicolor /app/share/icons/
+      # The speech model, its licence and readme, where the programs look for it
+      # (../share/recallcraft/models from /app/bin).
+      - install -Dm644 assets/models/whisper-base.en-q8_0.gguf /app/share/recallcraft/models/whisper-base.en-q8_0.gguf
+      - install -Dm644 assets/models/LICENSE-WHISPER.txt /app/share/recallcraft/models/LICENSE-WHISPER.txt
+      - install -Dm644 assets/models/README.md /app/share/recallcraft/models/README.md
+      - >-
+        version=$(awk '/^\[/{p=($0=="[workspace.package]");next} p&&$1=="version"{gsub(/[" ]/,"",$3);print $3;exit}' Cargo.toml);
+        install -d /app/share/metainfo;
+        sed -e "s/@VERSION@/$version/" -e "s/@DATE@/$(date -u +%Y-%m-%d)/"
+        packaging/linux/io.github.billsecond.recallcraft.metainfo.xml.in > /app/share/metainfo/io.github.billsecond.recallcraft.metainfo.xml
+    sources:
+      - type: dir
+        path: ../../..
+        skip:
+          - target
+          - dist
+          - build-flatpak
+          - .flatpak-builder
+      - cargo-sources.json
