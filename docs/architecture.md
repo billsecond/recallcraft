@@ -17,8 +17,10 @@
   service writes and plays the recording.
 - **The worker** (`recallcraft --hear <model>`), started by the service when there's speech to
   hear and let go after five minutes without a call: Whisper, below-normal priority, two threads.
-- Both children are in the service's process tree, which the computer-sound loopback leaves out:
-  RecallCraft never records its own replays.
+- The computer's sound is a speaker's loopback, as ScreenGrabCraft records it: the default
+  speaker, or during a call the one the call plays on. RecallCraft's own playback is in it, so the
+  service notes when it plays (the window tells it every two seconds while it plays) and the
+  hearer leaves those stretches out of the transcript.
 
 ## The recording (`crates/store/src/ring.rs`)
 

@@ -43,7 +43,9 @@ It runs all the time; a crash loses what was being said.
 
 - Nothing below `apps/` depends on eframe/egui/winit/tray-icon/global-hotkey/rfd (`cargo xtask layers`).
 - The service starts the window (`--window`) and the hearing worker (`--hear`) as its own child
-  processes: the process loopback leaves the service's process tree out of the recording.
+  processes. The computer's sound is a speaker's loopback (as ScreenGrabCraft's), so RecallCraft's
+  own playback is in it: the service is told when it plays (`--own-sound`), and the hearer leaves
+  that stretch of the computer's sound out of the transcript.
 - The window only reads what the service writes, plus the settings and owner edits to a call.
 
 ## Assets

@@ -27,7 +27,7 @@ pub enum Mic {
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Source {
     Mic(Mic),
-    /// What the computer plays, without RecallCraft's own sound (the default speaker's).
+    /// What the default speaker plays (its loopback, as ScreenGrabCraft records it).
     System,
     /// What one speaker plays, by its id: the one a call is played on when it isn't the default
     /// (a headset), whose sound the default speaker's loopback doesn't have.
