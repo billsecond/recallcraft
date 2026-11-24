@@ -1,6 +1,16 @@
-## RecallCraft 0.1
+## RecallCraft 0.2
 
-The first version: the last two days of what you heard and said, every call written down as it happens, all on your own computer.
+The last two days of what you heard and said, every call written down as it happens, all on your own computer.
+
+**New in 0.2**
+
+- **Both sides of a call on a headset.** When a call plays through a headset while the computer's default is its speakers, RecallCraft now records the headset, so the other people are heard and written down (0.1 recorded only the ring).
+- **Calls named after who they're with.** A call's title comes from the call's own window, never from your account (your email, your organisation's domain), and a one-to-one call's title names the other person, who labels their side of the transcript.
+- **Stays in the tray until you quit.** Closing or minimising the window puts it in the tray; RecallCraft keeps recording until you choose Quit, in the tray's menu or in Settings. It's started again if it ever stops unexpectedly.
+- **Record all the time, or only during calls**, in Settings or the tray's menu.
+- Installers and packages for Windows (x64, x86, ARM64), macOS, Linux and FreeBSD, built by the release workflow.
+
+**What it does**
 
 - **Always recording, compactly.** Your microphone and what the computer plays, as Opus in five-minute files; silence isn't kept. Older than the setting (48 hours by default) is deleted, except the calls you keep.
 - **Knows when you're on a call** in Teams, Zoom, Slack, Webex, Discord, WhatsApp, Phone Link, a browser meeting or another calling app, and names it from the meeting's window.
