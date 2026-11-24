@@ -8,6 +8,8 @@
 //! recallcraft --pause <minutes>    stop recording for a while (0: until --resume)
 //! recallcraft --resume             record again
 //! recallcraft --settings           open the window at its settings
+//! recallcraft --check-updates      ask GitHub for a newer RecallCraft now (a notice answers)
+//! recallcraft --install-update     install the update that's waiting (after the call, during one)
 //! recallcraft --quit               stop the running service
 //! recallcraft --background         the sign-in entry: run the service, and start it again if it
 //!                                  stops unexpectedly
@@ -24,12 +26,14 @@ mod browser;
 mod graphics;
 mod hotkeys;
 mod service;
+mod update;
 
 use std::process::ExitCode;
 
 use recallcraft_desktop::{logging, service as signin, version};
 
 const USAGE: &str = "usage: recallcraft [--replay] [--pause <minutes>] [--resume] [--settings] [--quit]
+       recallcraft --check-updates | --install-update
        recallcraft --background | --tray
        recallcraft service install|uninstall|status
        recallcraft --version";
@@ -92,6 +96,9 @@ fn main() -> ExitCode {
     }
     if args.iter().any(|a| a == "--window") {
         return browser::run(&args);
+    }
+    if args.iter().any(|a| a == "--notice") {
+        return browser::notice::run();
     }
     service::run(&args)
 }

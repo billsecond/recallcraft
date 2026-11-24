@@ -10,6 +10,7 @@
 mod call_view;
 mod everything;
 mod export_dialog;
+pub mod notice;
 mod settings_page;
 mod style;
 
@@ -111,6 +112,8 @@ pub enum Action {
     DeleteCall(String),
     Open(Page),
     Note(String),
+    /// Hand these to the service (Check now, Update now).
+    Tell(Vec<String>),
     /// Quit RecallCraft (the service, and the window).
     Quit,
 }
@@ -154,6 +157,8 @@ pub struct Browser {
     minimised: bool,
     /// When the service was last told this window is playing (its sound is in the recording).
     told_playing: Option<Instant>,
+    /// What the service says of updates (while it runs).
+    updates: Option<crate::update::Shared>,
 }
 
 /// Whether the window can go back to a tray: it was opened by the service, and the service is
@@ -203,6 +208,7 @@ impl Browser {
             tray_note: false,
             minimised: false,
             told_playing: None,
+            updates: None,
         }
     }
 
@@ -330,6 +336,8 @@ impl Browser {
                 .ok()
                 .and_then(|t| serde_json::from_str::<Status>(&t).ok())
                 .filter(|s| time::now_ms().saturating_sub(s.at_ms) < 8000);
+            // The service's word on updates, while it runs and the settings are open.
+            self.updates = if self.status.is_some() && self.page == Page::Settings { crate::update::read_shared() } else { None };
         }
         let live = self.status.as_ref().is_some_and(Status::in_call);
         if self.listed.is_none_or(|t| t.elapsed() > Duration::from_secs(if live { 2 } else { 5 })) {
@@ -426,6 +434,13 @@ impl Browser {
             Action::DeleteCall(id) => self.confirm = Some(Confirm::DeleteCall(id)),
             Action::Open(p) => self.page = p,
             Action::Note(n) => self.note(n),
+            Action::Tell(args) => {
+                std::thread::spawn(move || {
+                    if !instance::tell("service", &args) {
+                        log::warn!("the service didn't hear {args:?}");
+                    }
+                });
+            }
             // Handled where the window's context is at hand.
             Action::Quit => {}
         }
@@ -646,7 +661,9 @@ impl eframe::App for Browser {
             match self.page.clone() {
                 Page::Settings => {
                     let layout = self.layout.clone();
-                    let (changed, acts) = settings_page::show(ui, &mut self.settings, &mut self.settings_state, &layout);
+                    let in_call = self.status.as_ref().is_some_and(Status::in_call);
+                    let (changed, acts) =
+                        settings_page::show(ui, &mut self.settings, &mut self.settings_state, &layout, self.updates.as_ref(), in_call);
                     if changed {
                         let s = self.settings.clone();
                         self.settings = prefs::update(|x| *x = s);

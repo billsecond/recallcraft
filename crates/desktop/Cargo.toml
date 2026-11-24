@@ -17,7 +17,14 @@ log = { workspace = true }
 getrandom = { workspace = true }
 dirs = { workspace = true }
 jiff = { workspace = true }
+# The update check (update.rs): the latest release from GitHub, versions compared, the download's
+# SHA-256 checked.
+ureq = { workspace = true }
+semver = { workspace = true }
+ring = { workspace = true }
 
 [target.'cfg(target_os = "windows")'.dependencies]
 # The sign-in entry (Run, StartupApproved) is in the registry.
 winreg = { workspace = true }
+# The update check goes through the proxy Windows is set to use, if any.
+ureq = { workspace = true, features = ["win-system-proxy"] }

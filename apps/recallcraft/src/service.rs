@@ -8,6 +8,8 @@
 //! - A later start (`recallcraft --replay`, the Start menu) hands its arguments over
 //!   ([`instance`]).
 //! - The settings file is looked at twice a second: the window changes it.
+//! - Updates ([`crate::update`]): checked now and then (never during a call), offered in the
+//!   tray, a notice in the corner and the window's settings.
 
 use std::process::{Child, Command, ExitCode, Stdio};
 use std::time::{Duration, Instant, SystemTime};
@@ -29,6 +31,7 @@ use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
 use winit::window::WindowId;
 
 use crate::hotkeys::{Registered, Target};
+use crate::update::{Asker, Updates};
 
 /// What wakes the service.
 #[derive(Debug)]
@@ -49,8 +52,15 @@ struct Items {
     resume: MenuItem,
     calls_only: CheckMenuItem,
     settings: MenuItem,
+    check_updates: MenuItem,
+    /// Install Update (or Get Update) while one is waiting; in the menu only then.
+    update: Option<MenuItem>,
     quit: MenuItem,
+    menu: Menu,
 }
+
+/// Where the waiting update's item goes in the menu: before Check for Updates….
+const UPDATE_AT: usize = 12;
 
 struct ServiceApp {
     engine: Option<Engine>,
@@ -68,6 +78,7 @@ struct ServiceApp {
     tip: String,
     status_text: String,
     quitting: bool,
+    updates: Updates,
 }
 
 fn icon(look: Look) -> Option<tray_icon::Icon> {
@@ -216,6 +227,7 @@ pub fn run(args: &[String]) -> ExitCode {
         tip: String::new(),
         status_text: String::new(),
         quitting: false,
+        updates: Updates::new(),
     };
     let r = event_loop.run_app(&mut app);
     app.shut_down();
@@ -240,9 +252,12 @@ impl ServiceApp {
             resume: MenuItem::new("Resume recording", false, None),
             calls_only: CheckMenuItem::new("Record only during calls", true, self.settings.record_mode == RecordMode::CallsOnly, None),
             settings: MenuItem::new("Settings…", true, None),
+            check_updates: MenuItem::new("Check for Updates…", true, None),
+            update: None,
             quit: MenuItem::new("Quit RecallCraft", true, None),
+            menu: Menu::new(),
         };
-        let menu = Menu::new();
+        let menu = items.menu.clone();
         let sep = || PredefinedMenuItem::separator();
         for r in [
             menu.append(&items.status),
@@ -257,6 +272,7 @@ impl ServiceApp {
             menu.append(&sep()),
             menu.append(&items.calls_only),
             menu.append(&items.settings),
+            menu.append(&items.check_updates),
             menu.append(&items.quit),
         ] {
             if let Err(e) = r {
@@ -372,12 +388,64 @@ impl ServiceApp {
                         e.shared.playing(now.saturating_sub(500_000), until.min(now + 60_000_000));
                     }
                 }
+                "--check-updates" => {
+                    // From the window's settings (which show the answer), or the command line.
+                    let from_settings = it.as_slice().first().is_some_and(|w| w == "settings");
+                    if from_settings {
+                        it.next();
+                    }
+                    self.updates.ask(if from_settings { Asker::Settings } else { Asker::Tray });
+                }
+                "--install-update" => self.install_update(el),
+                "--dismiss-update" => self.updates.dismiss(),
                 "--quit" => {
                     self.quitting = true;
                     el.exit();
                 }
                 _ => {}
             }
+        }
+    }
+
+    fn in_call(&self) -> bool {
+        self.engine.as_ref().is_some_and(|e| e.status().in_call())
+    }
+
+    /// Update now. A portable copy's helper waits for RecallCraft to close: it quits.
+    fn install_update(&mut self, el: &ActiveEventLoop) {
+        let in_call = self.in_call();
+        self.updates.install_now(in_call);
+        if self.updates.quit {
+            log::info!("quitting so the update can be put in place");
+            self.quitting = true;
+            el.exit();
+        }
+    }
+
+    /// The tray's item for a waiting update, kept as the updates say.
+    fn sync_update_item(&mut self) {
+        let label = self.updates.tray_label();
+        let Some(i) = self.items.as_mut() else { return };
+        match (&label, &i.update) {
+            (Some(text), Some(item)) => {
+                if item.text() != *text {
+                    item.set_text(text);
+                }
+            }
+            (Some(text), None) => {
+                let item = MenuItem::new(text, true, None);
+                if let Err(e) = i.menu.insert(&item, UPDATE_AT) {
+                    log::warn!("tray menu: {e}");
+                }
+                i.update = Some(item);
+            }
+            (None, Some(item)) => {
+                if let Err(e) = i.menu.remove(item) {
+                    log::warn!("tray menu: {e}");
+                }
+                i.update = None;
+            }
+            (None, None) => {}
         }
     }
 
@@ -419,6 +487,15 @@ impl ServiceApp {
             && !matches!(c.try_wait(), Ok(None))
         {
             self.window = None;
+        }
+        let in_call = self.in_call();
+        self.updates.tick(in_call, self.settings.check_updates);
+        self.sync_update_item();
+        if self.updates.quit && !self.quitting {
+            log::info!("quitting so the update can be put in place");
+            self.quitting = true;
+            el.exit();
+            return;
         }
         let Some(engine) = &self.engine else { return };
         let st = engine.status();
@@ -498,6 +575,7 @@ impl ServiceApp {
 
     fn shut_down(&mut self) {
         self.replay = None;
+        self.updates.shut_down();
         if self.quitting {
             self.close_window();
         }
@@ -535,6 +613,18 @@ impl ApplicationHandler<Msg> for ServiceApp {
             },
             Msg::Menu(id) => {
                 let Some(i) = &self.items else { return };
+                if *i.check_updates.id() == id {
+                    self.updates.ask(Asker::Tray);
+                    self.tick(el);
+                    return;
+                }
+                if i.update.as_ref().is_some_and(|u| *u.id() == id) {
+                    self.install_update(el);
+                    if !self.quitting {
+                        self.tick(el);
+                    }
+                    return;
+                }
                 if *i.calls_only.id() == id {
                     // The menu ticked or unticked it already.
                     let mode = if i.calls_only.is_checked() { RecordMode::CallsOnly } else { RecordMode::Always };

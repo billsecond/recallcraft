@@ -17,6 +17,11 @@
   service writes and plays the recording.
 - **The worker** (`recallcraft --hear <model>`), started by the service when there's speech to
   hear and let go after five minutes without a call: Whisper, below-normal priority, two threads.
+- **The notice** (`recallcraft --notice`), started by the service when there's something to say
+  about updates and no call is going on: a small window in the corner of the screen. The service
+  checks for updates (`apps/recallcraft/src/update.rs`, `crates/desktop/src/update.rs`) and
+  writes what it knows to `%TEMP%\RecallCraft\updates\state.json`, which the notice and the
+  window's settings read; they answer with commands handed to the service.
 - The computer's sound is a speaker's loopback, as ScreenGrabCraft records it: the default
   speaker, or during a call the one the call plays on. RecallCraft's own playback is in it, so the
   service notes when it plays (the window tells it every two seconds while it plays) and the

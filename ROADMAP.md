@@ -19,6 +19,9 @@
       activity strip, catch up and live, rename, keep, delete, copy, search, last 48 hours by minute
 - [x] Export: WAV mixed/stereo/separate, Opus; text, Markdown, SRT, WebVTT, JSON
 - [x] Sign-in service with a supervisor; one instance; logs; CLI
+- [x] Updates: GitHub's latest release checked now and then (never during a call); on Windows the
+      MSI or portable zip downloaded, checked against the release's checksums and installed on
+      Update now, from a notice, the tray or Settings
 
 ## M1 — next
 

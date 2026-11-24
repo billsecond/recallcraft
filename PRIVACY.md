@@ -17,8 +17,19 @@ RecallCraft records sound around the clock, so it's built to keep that sound you
 - **Transcripts** are written only during calls, by the speech model on this computer, into the
   call's folder. Voices you name are kept as numbers describing the voice (no sound) in
   `%APPDATA%\RecallCraft\voices.json`.
-- **Nothing goes to the network.** No account, no cloud, no telemetry, no update check, no crash
-  reports. Sharing is you exporting a file.
+- **Nothing of what's recorded goes to the network.** No account, no cloud, no telemetry, no
+  crash reports. Sharing is you exporting a file.
+- **The one network request is the update check.** A minute after RecallCraft starts, and then
+  every six hours (never during a call), it asks GitHub for its latest release
+  (`https://api.github.com/repos/billsecond/recallcraft/releases/latest`). It's a plain HTTPS
+  request that says only "RecallCraft" and its version: no identifier, no cookie, nothing about
+  you or what was recorded. GitHub sees your IP address, as any website does. On Windows, when a
+  newer version is out, its installer (or, for a portable copy, its zip) is downloaded from the
+  same release into your temporary folder and checked against the release's checksums; it's
+  installed only when you choose Update now, and never during a call. Elsewhere you're told, and
+  the release page opens if you ask. Turn it off with "Check for updates automatically"
+  (Settings › Updates); Check now still works when you ask. The Flatpak has no network access, so
+  it never checks.
 - **The log** has times, device and program names, and how long things took; never what was said.
 
 ## Telling, and pausing
