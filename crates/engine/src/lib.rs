@@ -84,9 +84,45 @@ pub struct Shared {
     pub settings: RwLock<Settings>,
     pub status: Mutex<Status>,
     pub stop: AtomicBool,
+    /// When RecallCraft itself played sound (replays, the window's playback), µs since 1970: the
+    /// computer's sound then has it in it, and isn't written down as the others'.
+    own_sound: Mutex<Vec<(u64, u64)>>,
 }
 
+/// The most stretches of RecallCraft's own sound remembered.
+const OWN_SOUND_KEPT: usize = 64;
+
 impl Shared {
+    pub fn new(settings: Settings) -> Shared {
+        Shared {
+            settings: RwLock::new(settings.checked()),
+            status: Mutex::new(Status::default()),
+            stop: AtomicBool::new(false),
+            own_sound: Mutex::new(Vec::new()),
+        }
+    }
+
+    /// RecallCraft plays sound from `from_us` to `until_us` (joined to the stretch before when they
+    /// touch).
+    pub fn playing(&self, from_us: u64, until_us: u64) {
+        if until_us <= from_us {
+            return;
+        }
+        let mut own = self.own_sound.lock().unwrap_or_else(PoisonError::into_inner);
+        match own.last_mut() {
+            Some(last) if from_us <= last.1 + 1_000_000 && from_us >= last.0 => last.1 = last.1.max(until_us),
+            _ => own.push((from_us, until_us)),
+        }
+        if own.len() > OWN_SOUND_KEPT {
+            own.remove(0);
+        }
+    }
+
+    /// Whether RecallCraft was playing sound at any time in `[from, to)`.
+    pub fn was_playing(&self, from_us: u64, to_us: u64) -> bool {
+        self.own_sound.lock().unwrap_or_else(PoisonError::into_inner).iter().any(|(a, b)| *a < to_us && from_us < *b)
+    }
+
     pub fn settings(&self) -> Settings {
         self.settings.read().unwrap_or_else(PoisonError::into_inner).clone()
     }
@@ -112,8 +148,7 @@ pub struct Engine {
 
 impl Engine {
     pub fn start(config: Config, settings: Settings) -> Engine {
-        let shared =
-            Arc::new(Shared { settings: RwLock::new(settings.checked()), status: Mutex::new(Status::default()), stop: AtomicBool::new(false) });
+        let shared = Arc::new(Shared::new(settings));
         let (block_tx, block_rx) = channel();
         let (hear_tx, hear_rx) = channel();
         let mut threads = Vec::new();

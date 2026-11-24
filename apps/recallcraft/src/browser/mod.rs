@@ -4,7 +4,8 @@
 //!
 //! It reads what the service writes (the recording, the calls, `status.json`) and writes only the
 //! settings and what the owner changes in a call (its title, names, keeping it, deleting it). It's
-//! started by the service (`recallcraft --window`), so what it plays is left out of the recording.
+//! started by the service (`recallcraft --window`), and tells it while it plays, so what it plays
+//! isn't written down as the others'.
 
 mod call_view;
 mod everything;
@@ -151,6 +152,8 @@ pub struct Browser {
     tray_note: bool,
     /// The window was minimised when last looked at (it says so for a frame after it's shown).
     minimised: bool,
+    /// When the service was last told this window is playing (its sound is in the recording).
+    told_playing: Option<Instant>,
 }
 
 /// Whether the window can go back to a tray: it was opened by the service, and the service is
@@ -199,7 +202,22 @@ impl Browser {
             quitting: false,
             tray_note: false,
             minimised: false,
+            told_playing: None,
         }
+    }
+
+    /// While it plays, the service hears so every two seconds: what's played is in the computer's
+    /// sound, and isn't written down as the others'.
+    fn tell_playing(&mut self) {
+        let playing = self.player.as_ref().is_some_and(Player::is_playing);
+        if !playing || self.told_playing.is_some_and(|t| t.elapsed() < Duration::from_secs(2)) {
+            return;
+        }
+        self.told_playing = Some(Instant::now());
+        let until = time::now_us() + 4_000_000;
+        std::thread::spawn(move || {
+            instance::tell("service", &["--own-sound".to_string(), until.to_string()]);
+        });
     }
 
     fn show(&mut self, ctx: &egui::Context) {
@@ -602,6 +620,7 @@ impl eframe::App for Browser {
     fn logic(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         self.poll(ctx);
         self.hide_when_closed(ctx);
+        self.tell_playing();
         if self.hidden {
             // Hidden in the tray: a look now and then for the tray's Show.
             ctx.request_repaint_after(Duration::from_secs(1));

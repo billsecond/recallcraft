@@ -11,15 +11,15 @@
 //! headphones).
 
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
 use std::sync::mpsc::channel;
-use std::sync::{Arc, Mutex, RwLock};
 use std::time::Instant;
 
 use recallcraft_audio::Block;
 use recallcraft_engine::recorder::{self, ToHear};
 use recallcraft_engine::worker::{Hear, HearWith};
-use recallcraft_engine::{Shared, Status, hearer};
+use recallcraft_engine::{Shared, hearer};
 use recallcraft_model::{Call, Settings, Stream, time};
 use recallcraft_store::Layout;
 use recallcraft_store::calls::CallStore;
@@ -89,7 +89,7 @@ fn main() -> Result<(), String> {
     calls
         .save(&Call { id: "simulated".into(), app: "Simulated".into(), title: "A simulated call".into(), started_ms: t0, ..Call::default() })
         .map_err(|e| e.to_string())?;
-    let shared = Arc::new(Shared { settings: RwLock::new(Settings::default()), status: Mutex::new(Status::default()), stop: AtomicBool::new(false) });
+    let shared = Arc::new(Shared::new(Settings::default()));
     let (block_tx, block_rx) = channel::<Block>();
     let (hear_tx, hear_rx) = channel::<ToHear>();
     let _ = hear_tx.send(ToHear::CallStarted { id: "simulated".into(), started_ms: t0 });

@@ -1,9 +1,10 @@
 //! Windows: the microphone and the computer's sound through WASAPI.
 //!
-//! The computer's sound is a process loopback that leaves out RecallCraft's own processes
-//! (Windows 10 2004 and later): everything every other program plays, on whichever speaker,
-//! without RecallCraft's replays. Where that isn't there, the default speaker's loopback is used
-//! instead. Both are asked for 48 kHz stereo floats (Windows converts) and made mono here.
+//! The computer's sound is a speaker's loopback, as ScreenGrabCraft records it: everything the
+//! speaker plays, mixed, the calling apps' calls included. (A process loopback, which could
+//! leave RecallCraft's own sound out, misses the calls of some calling apps, Teams among them;
+//! RecallCraft's own sound is left out of the transcript instead.) Both are asked for 48 kHz
+//! stereo floats (Windows converts) and made mono here.
 
 use std::collections::VecDeque;
 use std::panic::{AssertUnwindSafe, catch_unwind};
@@ -52,11 +53,6 @@ fn open(source: &Source) -> Result<(AudioClient, String, String), String> {
     let e = DeviceEnumerator::new().map_err(|e| e.to_string())?;
     match source {
         Source::System => {
-            match catch_unwind(|| AudioClient::new_application_loopback_client(std::process::id(), false)) {
-                Ok(Ok(c)) => return Ok((c, "Computer sound".to_string(), String::new())),
-                Ok(Err(err)) => log::warn!("the computer's sound without RecallCraft's isn't there ({err}); recording the speaker's instead"),
-                Err(_) => log::warn!("the process loopback failed unexpectedly; recording the speaker's instead"),
-            }
             let d = e.get_default_device(Direction::Render).map_err(|e| format!("no speaker: {e}"))?;
             let name = d.get_friendlyname().unwrap_or_else(|_| "Speaker".to_string());
             let id = d.get_id().unwrap_or_default();
@@ -130,10 +126,13 @@ fn capture(source: &Source, tx: &Sender<Block>, ready: &Ready, shared: &Shared) 
     let frame_bytes = 4 * CHANNELS;
     let mut quiet_waits = 0u32;
     while !shared.stop.load(Ordering::SeqCst) {
-        if event.wait_for_event(200).is_err() {
+        // A loopback may not say when sound is there (some drivers never do): what's there is
+        // read every 20 ms however the wait ended.
+        let signalled = event.wait_for_event(20).is_ok();
+        if !signalled && reader.get_next_packet_size().ok().flatten().unwrap_or(0) == 0 {
             // Nothing came: a speaker's loopback is quiet while nothing plays.
             quiet_waits += 1;
-            if quiet_waits > 5 {
+            if quiet_waits > 50 {
                 placer.reset();
             }
             continue;

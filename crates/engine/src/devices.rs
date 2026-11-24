@@ -54,8 +54,9 @@ pub struct Now<'a> {
 /// The microphone and the computer's sound to record just now: none while paused; only during
 /// a call when the settings say so; the microphone the call uses during a call (unless the
 /// settings name one); a Bluetooth headset's microphone only during calls, unless the settings
-/// say always. The computer's sound is the default speaker's, without RecallCraft's own; during a
-/// call played on another speaker (a headset), that speaker's.
+/// say always. The computer's sound is what a speaker plays (its loopback, as ScreenGrabCraft
+/// records it): during a call, the speaker the call is played on; otherwise the default one, by
+/// its id, so a new default (a headset plugged in) is followed.
 pub fn wanted(s: &Settings, now: &Now<'_>) -> (Option<Source>, Option<Source>) {
     let in_call = now.in_call;
     let allowed = now.recording && (s.record_mode == RecordMode::Always || in_call);
@@ -76,9 +77,9 @@ pub fn wanted(s: &Settings, now: &Now<'_>) -> (Option<Source>, Option<Source>) {
         MicMode::DuringCalls => in_call,
         MicMode::Auto => in_call || !bt,
     };
-    let system = match now.call_speaker.filter(|d| in_call && !d.is_empty()) {
-        Some(d) if Some(d) != now.default_speaker => Source::Speaker(d.to_string()),
-        _ => Source::System,
+    let system = match (now.call_speaker.filter(|d| in_call && !d.is_empty()), now.default_speaker.filter(|d| !d.is_empty())) {
+        (Some(d), _) | (None, Some(d)) => Source::Speaker(d.to_string()),
+        (None, None) => Source::System,
     };
     let system_on = s.record_system && now.system_supported;
     (mic_on.then_some(Source::Mic(source)), system_on.then_some(system))
@@ -449,16 +450,21 @@ mod tests {
     }
 
     #[test]
-    fn a_call_played_on_a_headset_is_recorded_from_the_headset() {
+    fn a_call_is_recorded_from_the_speaker_it_plays_on() {
         let s = Settings::default();
+        let speaker = |d: &str| Some(Source::Speaker(d.into()));
+        // On a headset, the default being the speakers: the headset.
         let headset = Now { call_speaker: Some("headset"), default_speaker: Some("speakers"), ..in_call("mic") };
-        assert_eq!(wanted(&s, &headset).1, Some(Source::Speaker("headset".into())));
-        // On the default speaker: the loopback that leaves RecallCraft's own sound out.
+        assert_eq!(wanted(&s, &headset).1, speaker("headset"));
+        // On the default speaker: that speaker's loopback, as ScreenGrabCraft records it.
         let speakers = Now { call_speaker: Some("speakers"), default_speaker: Some("speakers"), ..in_call("mic") };
-        assert_eq!(wanted(&s, &speakers).1, SYS);
-        // Outside a call, whatever was seen last: the default speaker.
+        assert_eq!(wanted(&s, &speakers).1, speaker("speakers"));
+        // Outside a call, whatever was seen last: the default speaker, by its id (a new default
+        // is a new source, so the recording moves to it).
         let after = Now { call_speaker: Some("headset"), default_speaker: Some("speakers"), ..idle() };
-        assert_eq!(wanted(&s, &after).1, SYS);
+        assert_eq!(wanted(&s, &after).1, speaker("speakers"));
+        // No default known yet: the default, whichever it is.
+        assert_eq!(wanted(&s, &idle()).1, SYS);
     }
 
     #[test]

@@ -3,8 +3,8 @@
 //! - [`capture`]: the microphone and what the computer plays, each on a thread of its own,
 //!   handed over as [`Block`]s: mono 48 kHz samples and the time (µs since 1970) of the first.
 //!   On Windows through WASAPI: the microphone the settings or the call choose, and the
-//!   computer's sound through a process loopback that leaves RecallCraft's own sound out (so a
-//!   replay isn't recorded again). Elsewhere the microphone only, through cpal.
+//!   computer's sound through a speaker's loopback (the default speaker, or the one a call plays
+//!   on), as ScreenGrabCraft records it. Elsewhere the microphone only, through cpal.
 //! - [`place`]: when each block was heard, on the system clock, without drifting.
 //! - [`playback`]: the recording played back at any speed ([`stretch`] keeps voices' pitch).
 //!

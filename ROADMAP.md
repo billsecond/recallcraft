@@ -4,8 +4,8 @@
 
 - [x] The recording: microphone and computer sound, Opus in five-minute files, silence left out,
       kept 48 hours (a setting), read while it's written
-- [x] The computer's sound without RecallCraft's own (process loopback), the default speaker's
-      loopback where that isn't there
+- [x] The computer's sound from the speaker's loopback (as ScreenGrabCraft): the default speaker,
+      or the one a call plays on; RecallCraft's own playback kept out of the transcript
 - [x] Calls found by which program holds a microphone open (WASAPI audio sessions), webviews put
       down to their app; the meeting's title from its window; browser meetings named by service
 - [x] The call's microphone followed during a call; a Bluetooth headset's only during calls

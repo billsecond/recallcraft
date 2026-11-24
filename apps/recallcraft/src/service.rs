@@ -339,6 +339,11 @@ impl ServiceApp {
                 p.set_live(true);
                 p.play_from(from, Some(now));
                 log::info!("replaying the last {} s at {}×", s.replay_seconds, s.replay_speed);
+                // What it plays is in the computer's sound for that long: not the others'.
+                let lasts = (f64::from(s.replay_seconds) / f64::from(s.replay_speed.max(0.5)) * 1_000_000.0) as u64;
+                if let Some(e) = &self.engine {
+                    e.shared.playing(now, now + lasts + 2_000_000);
+                }
                 self.replay = Some(p);
             }
             Err(e) => log::warn!("replay: {e}"),
@@ -357,6 +362,16 @@ impl ServiceApp {
                     self.pause(minutes);
                 }
                 "--resume" => self.resume(),
+                "--own-sound" => {
+                    // The window plays the recording from now until then (µs since 1970).
+                    let until: u64 = it.next().and_then(|m| m.parse().ok()).unwrap_or(0);
+                    let now = time::now_us();
+                    if let Some(e) = &self.engine
+                        && until > now
+                    {
+                        e.shared.playing(now.saturating_sub(500_000), until.min(now + 60_000_000));
+                    }
+                }
                 "--quit" => {
                     self.quitting = true;
                     el.exit();

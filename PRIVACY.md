@@ -7,8 +7,9 @@ RecallCraft records sound around the clock, so it's built to keep that sound you
 - **Your microphone and what the computer plays**, all the time while recording is on (a
   Bluetooth headset's microphone only during calls, by default), or **only during calls** if you
   choose that (Settings, or the tray menu): then nothing is opened, let alone kept, between
-  calls. RecallCraft's own sound (its replays and playback) is left out, except during a call
-  played on a speaker other than the default (a headset), where that speaker is recorded whole.
+  calls. What the computer plays is what the speaker plays, mixed (during a call, the speaker the
+  call plays on), as ScreenGrabCraft records it, so RecallCraft's own replays are in it too; they
+  aren't written down as the others' words.
 - **Kept** in `%LOCALAPPDATA%\RecallCraft` (or the folder you choose), as Opus files of five
   minutes. Silence isn't kept. Everything older than the setting (48 hours by default) is
   deleted, every ten minutes; calls are kept as long as their own setting (30 days by default),

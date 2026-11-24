@@ -150,6 +150,10 @@ pub fn run(shared: &Shared, layout: &Layout, settings_dir: &Path, with: HearWith
                         log::debug!("an utterance of the microphone was the speakers; not heard");
                         continue;
                     }
+                    if stream == Stream::System && shared.was_playing(utt.start_us, utt.end_us()) {
+                        log::debug!("an utterance of the computer's sound was RecallCraft's own playback; not heard");
+                        continue;
+                    }
                     match live.as_ref().and_then(|id| states.get(id).map(|s| (id, s))) {
                         Some((id, st)) if st.holds(&utt) => queue.push_back(Item { call: id.clone(), stream, utt }),
                         _ => {
@@ -380,14 +384,11 @@ fn hear_some(
 
 #[cfg(test)]
 mod tests {
-    use std::sync::atomic::AtomicBool;
     use std::sync::mpsc::channel;
-    use std::sync::{Mutex, RwLock};
 
     use recallcraft_model::{Call, Settings};
 
     use super::*;
-    use crate::Status;
 
     /// Hears every window as one line per utterance in it, saying how long it was.
     struct Fake;
@@ -426,11 +427,7 @@ mod tests {
         let root = std::env::temp_dir().join(format!("recallcraft-hearer-{}", std::process::id()));
         let layout = Layout::new(&root);
         let calls = CallStore::new(&layout.calls());
-        let shared = Shared {
-            settings: RwLock::new(Settings { separate_voices: false, ..Settings::default() }),
-            status: Mutex::new(Status::default()),
-            stop: AtomicBool::new(false),
-        };
+        let shared = Shared::new(Settings { separate_voices: false, ..Settings::default() });
         let (tx, rx) = channel();
         let t0 = time::now_ms();
         calls.save(&Call { id: "c1".into(), started_ms: t0, ..Call::default() }).unwrap();
@@ -439,6 +436,9 @@ mod tests {
         tx.send(ToHear::Utterance { stream: Stream::Mic, utt: utt(t0 + 500, 3.0), echo: 0.0 }).unwrap();
         tx.send(ToHear::CallStarted { id: "c1".into(), started_ms: t0 }).unwrap();
         tx.send(ToHear::Utterance { stream: Stream::System, utt: utt(t0 + 5000, 4.0), echo: 0.0 }).unwrap();
+        // RecallCraft replaying something: in the computer's sound, but not the others'.
+        shared.playing((t0 + 11_000) * 1000, (t0 + 14_000) * 1000);
+        tx.send(ToHear::Utterance { stream: Stream::System, utt: utt(t0 + 11_500, 2.0), echo: 0.0 }).unwrap();
         // The speakers heard by the microphone: not heard.
         tx.send(ToHear::Utterance { stream: Stream::Mic, utt: utt(t0 + 5100, 3.5), echo: 0.9 }).unwrap();
         tx.send(ToHear::CallEnded { id: "c1".into(), ended_ms: t0 + 20_000 }).unwrap();
