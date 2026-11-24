@@ -1,6 +1,6 @@
 # Releasing RecallCraft
 
-> **Last reviewed:** 2026-11-24 · **Last updated:** 2026-11-24 · **Change:** major (first version: the packaging scripts and the release workflow, ported from ScreenGrabCraft's) · **Status:** the scripts and workflows are written and statically checked, and the Windows MSI was built locally from the real programs; **no workflow has run on GitHub yet, and nothing has been installed from a package**.
+> **Last reviewed:** 2026-11-24 · **Last updated:** 2026-11-24 · **Change:** major (first version: the packaging scripts and the release workflow, ported from ScreenGrabCraft's) · **Status:** the release workflow ran for 0.2.0: every system's packages built, and the Windows x64 install test stopped the publishing (it read a sign-in key the uninstall had removed; fixed for 0.3.0). Automatic updates are described below; the first release that has them is 0.3.0.
 
 The canonical recipe is [craftrules `release/playbook.md`](https://github.com/storytold/craftrules/blob/main/release/playbook.md);
 this file has the RecallCraft specifics. The scripts in `packaging/` are ScreenGrabCraft's with
