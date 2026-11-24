@@ -186,6 +186,9 @@ pub struct Settings {
     pub transcribe_calls: bool,
     /// Tell the other people's voices apart (Speaker 1, Speaker 2, …).
     pub separate_voices: bool,
+    /// Name the voices from the meeting app's window during a call (who it shows speaking, its
+    /// captions' speakers), read as a screen reader reads it.
+    pub names_from_app: bool,
     /// A browser using the microphone is a call (Meet, Teams or Zoom in a browser).
     pub browsers_are_calls: bool,
     /// Any program using the microphone is a call.
@@ -227,6 +230,7 @@ impl Default for Settings {
             record_system: true,
             transcribe_calls: true,
             separate_voices: true,
+            names_from_app: true,
             browsers_are_calls: true,
             any_app_is_a_call: false,
             more_call_apps: Vec::new(),

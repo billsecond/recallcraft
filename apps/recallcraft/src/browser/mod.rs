@@ -90,7 +90,8 @@ pub enum Page {
     Settings,
 }
 
-/// What a page asks the window to do.
+/// What a page asks the window to do (one now and then, so its size doesn't matter).
+#[allow(clippy::large_enum_variant)]
 #[derive(Clone, Debug, PartialEq)]
 pub enum Action {
     /// Play from a moment (ms), until `end` if given; `live` follows the recording.

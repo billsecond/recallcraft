@@ -14,6 +14,8 @@
 //! - [`recorder`]: writes the sound into the recording, and cuts it into utterances.
 //! - [`hearer`]: hears the utterances of calls (in a program of its own, [`worker`]), tells the
 //!   others' voices apart, leaves echoes out, and writes the lines.
+//! - [`names`]: during a call, reads the meeting app's window for who's speaking and who's on
+//!   it, and names the voices after them.
 //!
 //! Layer L4: no windows. Everything runs on threads of its own; [`Engine::stop`] ends them.
 #![deny(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::unimplemented, clippy::todo, clippy::unreachable)]
@@ -21,6 +23,7 @@
 pub mod devices;
 pub mod hearer;
 pub mod known;
+pub mod names;
 pub mod recorder;
 pub mod worker;
 
@@ -164,9 +167,14 @@ impl Engine {
             let (s, l, settings_dir, hear) = (shared.clone(), layout.clone(), config.settings_dir.clone(), config.hear);
             threads.extend(spawn("hearer", Box::new(move || hearer::run(&s, &l, &settings_dir, hear, hear_rx))));
         }
+        let (names_tx, names_rx) = channel();
+        {
+            let (s, l) = (shared.clone(), layout.clone());
+            threads.extend(spawn("names", Box::new(move || names::run(&s, &l, names_rx))));
+        }
         {
             let (s, l, own) = (shared.clone(), layout, config.own_exe);
-            threads.extend(spawn("devices", Box::new(move || devices::run(&s, &l, &own, block_tx, hear_tx))));
+            threads.extend(spawn("devices", Box::new(move || devices::run(&s, &l, &own, block_tx, hear_tx, names_tx))));
         }
         Engine { shared, threads }
     }

@@ -9,14 +9,18 @@
 //!   call started), and the other person's name when the title says it ("Call with …").
 //! - [`probe`]: Windows: which programs have a microphone open just now (and which one), and
 //!   every program's windows.
+//! - [`roster`]: who's on the call and who's speaking, from what the meeting app's window tells
+//!   screen readers; [`uia`] reads it (Windows' UI Automation).
 //!
-//! Layer L3. Everything but [`probe`] is plain logic, tested without devices.
+//! Layer L3. Everything but [`probe`] and [`uia`] is plain logic, tested without devices.
 #![deny(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::unimplemented, clippy::todo, clippy::unreachable)]
 
 pub mod apps;
 pub mod detector;
 pub mod probe;
+pub mod roster;
 pub mod titles;
+pub mod uia;
 
 pub use apps::{AppKind, CallApp};
 pub use detector::{Capturer, Detector, Event, Observation, Rules};

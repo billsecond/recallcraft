@@ -47,6 +47,26 @@ browser, or one the owner listed) holding a microphone for 1.5 s starts a call (
 earlier); none holding one for 15 s ends it. A call shorter than 20 s with nothing said is dropped.
 Every 3 s, the app's windows: the one that wasn't there before the call names it.
 
+## Names from the meeting app (`crates/engine/src/names.rs`, `crates/calls/src/roster.rs`, `uia.rs`)
+
+During a call, a thread of its own reads the calling app's window (the one that appeared with
+the call, else all of the app's) through UI Automation: the whole tree in one cached request, in
+the raw view (the control view leaves out the pages of Chromium apps, which the new Teams and
+Slack are), with a focus listener that does nothing so Chromium shows its pages at all. It looks
+again every 400 ms to 3 s, four times as long as a look takes. `roster::read` finds, in the
+elements' names, the people on the call ("Jane Doe (Guest), Muted"), who is marked speaking
+("Jane Doe, Speaking", "Jane Doe is speaking", "Active speaker: Jane Doe"), the owner ("(You)",
+and the account names in the app's titles) and the captions (author then text, or "Author:
+text", inside an element named like captions). Speaking marks, and a newest caption that
+changed (a second earlier), become stretches; every five seconds the ended ones go to the call's
+`speaking.jsonl`, the people to `call.json`, and `names::voices_named` matches the transcript's
+lines to the stretches: a voice gets a name when at least two of its lines and three seconds
+fall in that person's stretches, and seven in ten of those that fall in anyone's (without voice
+separation, nine in ten and three lines). Names the owner or the title gave are never replaced.
+
+Chromium apps keep their accessibility tree built once it's been asked for, which costs them a
+little more work while they run.
+
 ## Hearing (`crates/engine/src/hearer.rs`, `crates/speech`)
 
 The recorder cuts each stream into utterances at pauses of 0.7 s (the background level is

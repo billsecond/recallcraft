@@ -9,8 +9,13 @@ description = "Knowing when a call is on: which programs are using a microphone,
 [lints]
 workspace = true
 
+[dependencies]
+log = { workspace = true }
+
 # Windows: the programs with a microphone open (WASAPI's audio sessions), every program and its
 # parent (a tool-help snapshot), and their windows' titles, through safe bindings.
 [target.'cfg(target_os = "windows")'.dependencies]
 wasapi = { workspace = true }
 winsafe = { workspace = true, features = ["kernel", "user"] }
+# The meeting app's window, as a screen reader reads it (uia.rs).
+uiautomation = { workspace = true }

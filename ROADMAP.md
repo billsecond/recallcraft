@@ -26,8 +26,11 @@
 ## M1 — next
 
 - [ ] An installer (MSI, per user), with the model beside the program; a Start menu entry
-- [ ] Names from the meeting app itself: the participant list and the live captions' speakers
-      through UI Automation (Teams, Zoom), matched to the voices by time
+- [x] Names from the meeting app itself (first version): the participants, who it shows speaking
+      and the live captions' speakers through UI Automation, matched to the voices by time; to
+      be tuned against real Teams, Zoom and Meet calls (`recallcraft-cli call-window`)
+- [ ] The meeting app's names tuned on real calls: each app's own words for speaking, its
+      captions' layout, and languages other than English
 - [ ] Encryption at rest (Windows' data protection for the user), keys per file
 - [ ] A storage limit as well as a time limit
 - [ ] Transcribe any stretch of the last two days on request (not only calls)

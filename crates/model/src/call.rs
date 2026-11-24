@@ -69,10 +69,23 @@ pub struct Call {
     pub windows: Vec<String>,
     /// Whether the title was given by the owner (it is then never replaced by a window's).
     pub titled_by_owner: bool,
+    /// Who the meeting app's window showed on the call (the owner left out).
+    pub people: Vec<String>,
 }
 
 /// The most window titles remembered for a call.
 pub const MAX_WINDOWS: usize = 24;
+/// The most people remembered for a call.
+pub const MAX_PEOPLE: usize = 100;
+
+/// A stretch of a call the meeting app showed someone speaking (`speaking.jsonl` in its folder).
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct Spoken {
+    pub name: String,
+    pub from_ms: u64,
+    pub to_ms: u64,
+}
 
 impl Call {
     pub fn is_live(&self) -> bool {
@@ -125,6 +138,15 @@ impl Call {
         self.windows.push(t);
     }
 
+    /// Remembers someone the meeting app showed on the call.
+    pub fn saw_person(&mut self, name: &str) {
+        let n = clip(name.trim(), MAX_NAME);
+        if n.is_empty() || self.people.len() >= MAX_PEOPLE || self.people.iter().any(|p| p.eq_ignore_ascii_case(&n)) {
+            return;
+        }
+        self.people.push(n);
+    }
+
     /// The call made safe after reading it from a file.
     pub fn checked(mut self) -> Call {
         self.app = clip(&self.app, MAX_NAME);
@@ -132,6 +154,10 @@ impl Call {
         self.title = clip(&self.title, MAX_NAME * 2);
         self.names = self.names.into_iter().filter(|(k, _)| Speaker::from_key(k).is_some()).map(|(k, v)| (k, clip(&v, MAX_NAME))).collect();
         self.windows.truncate(MAX_WINDOWS);
+        self.people.truncate(MAX_PEOPLE);
+        for p in &mut self.people {
+            *p = clip(p, MAX_NAME);
+        }
         if let Some(e) = self.ended_ms {
             self.ended_ms = Some(e.max(self.started_ms));
         }

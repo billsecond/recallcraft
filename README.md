@@ -38,6 +38,12 @@ Speaker 2  0:13   Great. Can you walk us through what is left before the release
   by their voices (*Speaker 1*, *Speaker 2*); name one once and RecallCraft knows that voice on
   later calls. With speakers instead of headphones, the others heard by your microphone aren't
   taken for you.
+- **Names from the meeting app.** During a call RecallCraft reads the meeting app's window as a
+  screen reader would: who's on the call, who it shows speaking, and its live captions' speakers.
+  A voice whose lines keep coming while the app shows the same person speaking is named after
+  them (*Speaker 2* becomes *Jane Doe*). Turning on the app's live captions helps.
+  `recallcraft-cli call-window`, run during a call, shows what the app's window tells
+  RecallCraft.
 - **Live transcript.** Whisper runs on your computer, in a program of its own at below-normal
   priority, only on what's said during calls. A minute of call takes about four seconds to hear.
 - **Replay.** Ctrl+Alt+R (or the tray menu) plays the last 30 seconds again at 1.5×, without

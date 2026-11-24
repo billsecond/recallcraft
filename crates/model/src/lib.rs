@@ -10,7 +10,7 @@ pub mod settings;
 pub mod speaker;
 pub mod time;
 
-pub use call::{Call, Line};
+pub use call::{Call, Line, Spoken};
 pub use settings::{AudioExport, ExportSettings, MicMode, RecordMode, Settings, TranscriptFormat};
 pub use speaker::{Speaker, Stream};
 
