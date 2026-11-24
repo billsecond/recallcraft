@@ -100,6 +100,36 @@ mod imp {
         });
         out
     }
+
+    pub fn playing(procs: &Processes, app_exe: &str) -> Vec<Playing> {
+        let _ = wasapi::initialize_mta();
+        let mut out: Vec<Playing> = Vec::new();
+        let Ok(e) = DeviceEnumerator::new() else { return out };
+        let Ok(devices) = e.get_device_collection(Direction::Render) else { return out };
+        for dev in (&devices).into_iter().flatten() {
+            let Ok(id) = dev.get_id() else { continue };
+            let Ok(manager) = dev.get_iaudiosessionmanager() else { continue };
+            let Ok(sessions) = manager.get_audiosessionenumerator() else { continue };
+            let count = sessions.get_count().unwrap_or(0).clamp(0, 500);
+            for i in 0..count {
+                let Ok(s) = sessions.get_session(i) else { continue };
+                if s.get_state().ok() != Some(SessionState::Active) {
+                    continue;
+                }
+                let Ok(pid) = s.get_process_id() else { continue };
+                if pid == 0 || app_of(pid, procs) != app_exe {
+                    continue;
+                }
+                let peak = s.get_audiometerinformation().and_then(|m| m.get_peak_value()).unwrap_or(0.0);
+                let peak = if peak.is_finite() { peak.clamp(0.0, 1.0) } else { 0.0 };
+                match out.iter_mut().find(|p| p.device_id == id) {
+                    Some(p) => p.peak = p.peak.max(peak),
+                    None => out.push(Playing { device_id: id.clone(), peak }),
+                }
+            }
+        }
+        out
+    }
 }
 
 #[cfg(not(target_os = "windows"))]
@@ -111,6 +141,10 @@ mod imp {
     }
 
     pub fn capturing(_procs: &Processes, _own: &[u32]) -> Vec<Capturer> {
+        Vec::new()
+    }
+
+    pub fn playing(_procs: &Processes, _app_exe: &str) -> Vec<Playing> {
         Vec::new()
     }
 
@@ -134,6 +168,49 @@ pub fn windows() -> Vec<Window> {
     imp::windows()
 }
 
+/// A speaker an app is playing through just now, and how loud it is (0 to 1).
+#[derive(Clone, Debug, PartialEq)]
+pub struct Playing {
+    pub device_id: String,
+    pub peak: f32,
+}
+
+/// The speakers the app `app_exe` (and the programs it started) is playing through just now.
+pub fn playing(procs: &Processes, app_exe: &str) -> Vec<Playing> {
+    imp::playing(procs, app_exe)
+}
+
+/// Follows which speaker a call is played on: the one it plays loudest through, held for a
+/// while so a moment of quiet (or a notification sound elsewhere) doesn't switch it.
+#[derive(Clone, Debug, Default)]
+pub struct CallSpeaker {
+    /// Each speaker's loudness, decaying (so the one used lately wins).
+    seen: Vec<(String, f32)>,
+}
+
+impl CallSpeaker {
+    /// What was seen this time; returns the speaker the call is on, if any.
+    pub fn observe(&mut self, playing: &[Playing]) -> Option<String> {
+        for s in &mut self.seen {
+            s.1 *= 0.85;
+        }
+        for p in playing {
+            // Just being there counts a little; sound counts more.
+            let score = 0.05 + p.peak;
+            match self.seen.iter_mut().find(|s| s.0 == p.device_id) {
+                Some(s) => s.1 += score,
+                None => self.seen.push((p.device_id.clone(), score)),
+            }
+        }
+        self.seen.retain(|s| s.1 > 0.01);
+        self.seen.iter().max_by(|a, b| a.1.total_cmp(&b.1)).map(|s| s.0.clone())
+    }
+
+    pub fn reset(&mut self) {
+        self.seen.clear();
+    }
+}
+
 /// The processes of an app: those whose program is `app_exe`, and those they started.
 pub fn pids_of(app_exe: &str, procs: &Processes) -> Vec<u32> {
     procs.keys().copied().filter(|pid| app_of(*pid, procs) == app_exe || procs.get(pid).is_some_and(|p| p.exe == app_exe)).collect()
@@ -154,6 +231,31 @@ pub fn own_tree(procs: &Processes) -> Vec<u32> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn at(id: &str, peak: f32) -> Playing {
+        Playing { device_id: id.into(), peak }
+    }
+
+    #[test]
+    fn the_call_s_speaker_is_the_one_it_plays_on() {
+        let mut s = CallSpeaker::default();
+        assert_eq!(s.observe(&[]), None);
+        // It rings on the speakers, then the call is answered on the headset.
+        assert_eq!(s.observe(&[at("speakers", 0.6)]).as_deref(), Some("speakers"));
+        for _ in 0..6 {
+            s.observe(&[at("headset", 0.3)]);
+        }
+        assert_eq!(s.observe(&[at("headset", 0.3)]).as_deref(), Some("headset"));
+        // A moment of quiet, or a notification on the speakers, doesn't move it.
+        assert_eq!(s.observe(&[at("headset", 0.0)]).as_deref(), Some("headset"));
+        assert_eq!(s.observe(&[at("headset", 0.0), at("speakers", 0.2)]).as_deref(), Some("headset"));
+        // Gone a long while: forgotten.
+        for _ in 0..40 {
+            s.observe(&[]);
+        }
+        assert_eq!(s.observe(&[]), None);
+        s.reset();
+    }
 
     #[test]
     fn a_webview_s_microphone_is_its_app_s() {

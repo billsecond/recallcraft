@@ -40,6 +40,14 @@ pub fn default_microphone(communications: bool) -> Option<Device> {
     Some(Device { id: d.get_id().ok()?, name: d.get_friendlyname().ok()? })
 }
 
+/// The system's default speaker (what the computer's sound is recorded from outside calls).
+pub fn default_speaker() -> Option<Device> {
+    com();
+    let e = DeviceEnumerator::new().ok()?;
+    let d = e.get_default_device(Direction::Render).ok()?;
+    Some(Device { id: d.get_id().ok()?, name: d.get_friendlyname().ok()? })
+}
+
 fn open(source: &Source) -> Result<(AudioClient, String, String), String> {
     let e = DeviceEnumerator::new().map_err(|e| e.to_string())?;
     match source {
@@ -53,6 +61,15 @@ fn open(source: &Source) -> Result<(AudioClient, String, String), String> {
             let name = d.get_friendlyname().unwrap_or_else(|_| "Speaker".to_string());
             let id = d.get_id().unwrap_or_default();
             Ok((d.get_iaudioclient().map_err(|e| e.to_string())?, name, id))
+        }
+        Source::Speaker(id) => {
+            // A speaker opened for recording is its loopback: everything it plays.
+            let d = e.get_device(id).map_err(|e| format!("the call's speaker: {e}"))?;
+            if d.get_direction() != Direction::Render {
+                return Err("the call's speaker isn't a speaker".to_string());
+            }
+            let name = d.get_friendlyname().unwrap_or_else(|_| "Speaker".to_string());
+            Ok((d.get_iaudioclient().map_err(|e| e.to_string())?, name, id.clone()))
         }
         Source::Mic(m) => {
             let d = match m {

@@ -11,7 +11,7 @@ pub mod speaker;
 pub mod time;
 
 pub use call::{Call, Line};
-pub use settings::{AudioExport, ExportSettings, MicMode, Settings, TranscriptFormat};
+pub use settings::{AudioExport, ExportSettings, MicMode, RecordMode, Settings, TranscriptFormat};
 pub use speaker::{Speaker, Stream};
 
 /// RecallCraft's version.

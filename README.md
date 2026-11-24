@@ -20,12 +20,20 @@ Speaker 2  0:13   Great. Can you walk us through what is left before the release
 
 ## What it does
 
-- **Always recording, compactly.** Both sides are kept as Opus (24–32 kbit/s), in files of five
-  minutes; silence isn't kept. A day of a busy office is a few hundred megabytes. Older than the
-  setting (48 hours by default) is deleted, except the calls you keep.
+- **Always recording, compactly, or only during calls.** Both sides are kept as Opus (24–32
+  kbit/s), in files of five minutes; silence isn't kept. A day of a busy office is a few hundred
+  megabytes. Older than the setting (48 hours by default) is deleted, except the calls you keep.
+  Or choose **Record only during calls** (Settings, or the tray menu): the microphone and the
+  computer's sound are opened when a call starts and closed when it ends.
+- **Always in the tray.** Closing or minimising the window puts it in the tray; RecallCraft keeps
+  recording until you choose **Quit** (in the tray's menu, or Settings). It runs under a
+  supervisor that starts it again if it ever stops unexpectedly.
 - **Knows when you're on a call.** A call is a calling app holding a microphone open. Its title
-  comes from the meeting's window ("Weekly sync | Microsoft Teams" is *Weekly sync*), and a
-  one-to-one call's title names the other person.
+  comes from the call's window ("Weekly sync | Microsoft Teams" is *Weekly sync*), never from your
+  own account's window, and a one-to-one call's title names the other person, who then labels
+  their side of the transcript.
+- **Hears both sides, whatever you listen on.** During a call RecallCraft records the speaker the
+  calling app is actually playing on: a headset, when the computer's default is its speakers.
 - **Knows who said what.** The microphone is you. The computer's sound is the others, told apart
   by their voices (*Speaker 1*, *Speaker 2*); name one once and RecallCraft knows that voice on
   later calls. With speakers instead of headphones, the others heard by your microphone aren't
