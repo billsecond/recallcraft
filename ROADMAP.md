@@ -15,8 +15,10 @@
       Bhattacharyya distance), named voices known again on later calls
 - [x] Echo: the speakers heard by the microphone left out, by loudness and by words
 - [x] Tray: Replay, Pause, Settings, status; Replay shortcut; a dot during calls
+- [x] Replay stops when it has played the last seconds, with a bar that shows it and a Stop;
+      what RecallCraft plays isn't recorded
 - [x] Window: calls by day, live call, transcript following playback, speed 0.75–2× (pitch kept),
-      activity strip, catch up and live, rename, keep, delete, copy, search, last 48 hours by minute
+      activity strip, catch up, stop, rename, keep, delete, copy, search, last 48 hours by minute
 - [x] Export: WAV mixed/stereo/separate, Opus; text, Markdown, SRT, WebVTT, JSON
 - [x] Sign-in service with a supervisor; one instance; logs; CLI
 - [x] Updates: GitHub's latest release checked now and then (never during a call); on Windows the

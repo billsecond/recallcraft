@@ -218,7 +218,14 @@ pub fn show(ui: &mut egui::Ui, s: &mut Settings, st: &mut State, layout: &Layout
                 }
             });
         }
-        ui.label(RichText::new("Like Ctrl+Alt+R. Pressed again while it plays, Replay stops.").small().weak());
+        ui.label(
+            RichText::new(
+                "Like Ctrl+Alt+R. Replay stops when it has played those seconds; a bar at the bottom of the screen \
+                 shows it, with a Stop, and pressing the shortcut again stops it too. What RecallCraft plays isn't recorded.",
+            )
+            .small()
+            .weak(),
+        );
 
         section(ui, "Export");
         ui.horizontal(|ui| {

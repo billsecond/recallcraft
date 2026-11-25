@@ -42,8 +42,16 @@ pub fn show(ui: &mut egui::Ui, st: &mut State, reader: &mut RingReader, settings
     }
     ui.heading(format!("Everything heard in the last {} hours", settings.keep_audio_hours));
     ui.label(RichText::new("Each row is an hour and each cell a minute: you above, the computer's sound below, calls marked in amber. Click a minute to play from there.").weak());
-    ui.add_space(6.0);
     let pos = player.filter(|p| p.is_playing()).map(|p| p.position_us() / 1000);
+    if let Some(p) = pos {
+        ui.horizontal(|ui| {
+            if ui.button("⏹ Stop").clicked() {
+                out.push(Action::Stop);
+            }
+            ui.label(format!("Playing {} {}", time::local_date(p), time::local_time(p)));
+        });
+    }
+    ui.add_space(6.0);
     let hours = st.minutes.len().div_ceil(60);
     egui::ScrollArea::vertical().id_salt("everything").auto_shrink([false, false]).show(ui, |ui| {
         let mut quiet = 0usize;

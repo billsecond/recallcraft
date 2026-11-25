@@ -88,7 +88,8 @@ pub struct Shared {
     pub status: Mutex<Status>,
     pub stop: AtomicBool,
     /// When RecallCraft itself played sound (replays, the window's playback), µs since 1970: the
-    /// computer's sound then has it in it, and isn't written down as the others'.
+    /// computer's sound then has it in it, so it isn't recorded (it would be played again in the
+    /// next replay) or written down as the others'.
     own_sound: Mutex<Vec<(u64, u64)>>,
 }
 
@@ -121,9 +122,23 @@ impl Shared {
         }
     }
 
+    /// RecallCraft stopped playing: what it said it would play after `at_us` isn't played.
+    pub fn stopped_playing(&self, at_us: u64) {
+        let mut own = self.own_sound.lock().unwrap_or_else(PoisonError::into_inner);
+        own.retain(|(a, _)| *a < at_us);
+        for s in own.iter_mut() {
+            s.1 = s.1.min(at_us);
+        }
+    }
+
     /// Whether RecallCraft was playing sound at any time in `[from, to)`.
     pub fn was_playing(&self, from_us: u64, to_us: u64) -> bool {
         self.own_sound.lock().unwrap_or_else(PoisonError::into_inner).iter().any(|(a, b)| *a < to_us && from_us < *b)
+    }
+
+    /// The stretches RecallCraft played sound in that touch `[from, to)`.
+    pub fn own_sound_in(&self, from_us: u64, to_us: u64) -> Vec<(u64, u64)> {
+        self.own_sound.lock().unwrap_or_else(PoisonError::into_inner).iter().filter(|(a, b)| *a < to_us && from_us < *b).copied().collect()
     }
 
     pub fn settings(&self) -> Settings {
@@ -199,5 +214,25 @@ impl Engine {
                 let _ = t.join();
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_stretch_of_recallcraft_s_own_sound_ends_when_it_stops() {
+        let s = Shared::new(Settings::default());
+        s.playing(1_000_000, 25_000_000);
+        assert!(s.was_playing(20_000_000, 21_000_000));
+        s.stopped_playing(8_000_000);
+        assert_eq!(s.own_sound_in(0, u64::MAX), vec![(1_000_000, 8_000_000)]);
+        assert!(!s.was_playing(8_000_000, 21_000_000));
+        // One said to start after it stopped goes.
+        s.playing(30_000_000, 34_000_000);
+        s.stopped_playing(29_000_000);
+        assert_eq!(s.own_sound_in(0, u64::MAX), vec![(1_000_000, 8_000_000)]);
+        assert!(s.own_sound_in(9_000_000, 10_000_000).is_empty());
     }
 }

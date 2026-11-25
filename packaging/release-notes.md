@@ -7,6 +7,10 @@ The last two days of what you heard and said, every call written down as it happ
 - **Names from the meeting app.** During a call, RecallCraft reads the meeting app's window the way a screen reader does. It sees who's on the call, who the app shows speaking, and who said each line in the app's live captions. A voice whose lines keep coming while the app shows the same person speaking is named after them, so *Speaker 2* becomes *Jane Doe*. A name you gave is never replaced. The call's page lists who the app showed in the meeting, and search finds calls by those names. Turning on the app's live captions helps. Turn it off in Settings › Calls.
 - **`recallcraft-cli call-window`**, run during a call, shows what the meeting app's window tells RecallCraft. It's for when names don't appear.
 
+**Fixed since 0.4.0**
+
+- **Replay stops, and isn't recorded again.** Replay plays the last 30 seconds (or what Settings › Replay says) and stops when it has played them. A bar at the bottom of the screen shows how far it has got, with a **Stop**; the shortcut again, or the tray's Stop Replay, stops it too. What RecallCraft plays isn't recorded, so a replay no longer turns up in the next one, round and round. In the window, Catch up stops once it has caught up, and Stop is next to Play.
+
 **Coming from 0.3:** RecallCraft offers this update by itself (or choose Check for Updates… in the tray). **Coming from 0.2:** 0.2 can't update itself, so install 0.4 over it once (the MSI upgrades it in place; for the portable zip, unzip over the old folder). From then on, updates come to you.
 
 **New in 0.3**
