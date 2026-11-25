@@ -6,10 +6,13 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 
 use recallcraft_model::call::slug;
-use recallcraft_model::{Call, Line, time};
+use recallcraft_model::{Call, Line, Spoken, time};
 
 const CALL: &str = "call.json";
 const TRANSCRIPT: &str = "transcript.jsonl";
+/// Who the meeting app showed speaking, and when.
+const SPEAKING: &str = "speaking.jsonl";
+const MAX_SPEAKING: u64 = 8 * 1024 * 1024;
 /// The largest call file or transcript read.
 const MAX_CALL: u64 = 1024 * 1024;
 const MAX_TRANSCRIPT: u64 = 64 * 1024 * 1024;
@@ -113,6 +116,42 @@ impl CallStore {
         lines
     }
 
+    /// Adds stretches the meeting app showed someone speaking.
+    pub fn append_speaking(&self, id: &str, spoken: &[Spoken]) -> std::io::Result<()> {
+        let dir = self.dir(id).ok_or_else(|| std::io::Error::other("not a call id"))?;
+        std::fs::create_dir_all(&dir)?;
+        let path = dir.join(SPEAKING);
+        if std::fs::metadata(&path).is_ok_and(|m| m.len() > MAX_SPEAKING) {
+            return Ok(());
+        }
+        let mut text = String::new();
+        for s in spoken {
+            if let Ok(j) = serde_json::to_string(s) {
+                text.push_str(&j);
+                text.push('\n');
+            }
+        }
+        let mut f = OpenOptions::new().create(true).append(true).open(path)?;
+        f.write_all(text.as_bytes())
+    }
+
+    /// The stretches the meeting app showed someone speaking, in order.
+    pub fn speaking(&self, id: &str) -> Vec<Spoken> {
+        let Some(dir) = self.dir(id) else { return Vec::new() };
+        let path = dir.join(SPEAKING);
+        if std::fs::metadata(&path).map_or(true, |m| m.len() > MAX_SPEAKING) {
+            return Vec::new();
+        }
+        let Ok(text) = std::fs::read_to_string(&path) else { return Vec::new() };
+        let mut out: Vec<Spoken> = text
+            .lines()
+            .filter_map(|l| serde_json::from_str::<Spoken>(l).ok())
+            .filter(|s| !s.name.trim().is_empty() && s.to_ms >= s.from_ms)
+            .collect();
+        out.sort_by_key(|s| (s.from_ms, s.to_ms));
+        out
+    }
+
     /// The transcript's size: it changes when lines are added.
     pub fn transcript_len(&self, id: &str) -> u64 {
         self.dir(id).and_then(|d| std::fs::metadata(d.join(TRANSCRIPT)).ok()).map_or(0, |m| m.len())
@@ -149,7 +188,7 @@ impl CallStore {
             let title = call.display_title().to_lowercase();
             let lines = self.lines(&call.id);
             let all: String = lines.iter().map(|l| l.text.to_lowercase()).collect::<Vec<_>>().join(" ");
-            let names: String = call.names.values().map(|n| n.to_lowercase()).collect::<Vec<_>>().join(" ");
+            let names: String = call.names.values().chain(&call.people).map(|n| n.to_lowercase()).collect::<Vec<_>>().join(" ");
             if !needles.iter().all(|n| all.contains(n) || title.contains(n) || names.contains(n)) {
                 continue;
             }

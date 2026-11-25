@@ -180,6 +180,13 @@ pub fn show(
             }
         }
     });
+    if !v.call.people.is_empty() {
+        let shown: Vec<&str> = v.call.people.iter().take(30).map(String::as_str).collect();
+        let more = v.call.people.len().saturating_sub(shown.len());
+        let list = if more > 0 { format!("{} and {more} more", shown.join(", ")) } else { shown.join(", ") };
+        let app = if v.call.app.trim().is_empty() { "the app" } else { v.call.app.trim() };
+        ui.label(RichText::new(format!("In the meeting, as {app} showed it: {list}")).small().weak());
+    }
     let mut done_renaming = false;
     if let Some((s, text)) = v.rename.as_mut() {
         let s = *s;

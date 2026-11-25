@@ -8,9 +8,13 @@
 //! recallcraft-cli search <words…> [--json]           calls where they were said
 //! recallcraft-cli status                             what the service is doing
 //! recallcraft-cli hear <file.wav> [--model <file>]   write down what's said in a WAV file
+//! recallcraft-cli call-window [--app <program.exe>]  what the call app's window tells screen
+//!                                                    readers, and who RecallCraft finds in it
 //! ```
 //!
-//! It reads the folders the settings name; it never records anything itself.
+//! It reads the folders the settings name; it never records anything itself. `call-window`
+//! prints what the meeting app's window says (names, maybe chat): it stays on this computer
+//! unless you share it.
 #![deny(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::unimplemented, clippy::todo, clippy::unreachable)]
 
 use std::path::PathBuf;
@@ -30,7 +34,51 @@ const USAGE: &str = "usage: recallcraft-cli calls [--json]
        recallcraft-cli search <words…> [--json]
        recallcraft-cli status
        recallcraft-cli hear <file.wav> [--model <file.gguf>]
+       recallcraft-cli call-window [--app <program.exe>]
        recallcraft-cli --version";
+
+/// What the call app's window tells screen readers, element by element, and who RecallCraft
+/// finds in it: the app with a microphone open (a calling app first), or `--app`.
+fn call_window(args: &[String]) -> Result<(), String> {
+    use recallcraft_calls::{apps, probe, roster, uia};
+    let procs = probe::processes();
+    let app = match option(args, "--app") {
+        Some(a) => a.to_ascii_lowercase(),
+        None => {
+            let using = probe::capturing(&procs, &probe::own_tree(&procs));
+            let mut apps_using: Vec<String> = using.into_iter().map(|c| c.app_exe).collect();
+            apps_using.sort_by_key(|a| (!apps::known(a), apps::is_browser(a)));
+            apps_using.into_iter().next().ok_or("no program is using a microphone: start a call, or name the app with --app ms-teams.exe")?
+        }
+    };
+    let pids = probe::pids_of(&app, &procs);
+    if pids.is_empty() {
+        return Err(format!("{app} isn't running"));
+    }
+    let reader = uia::Reader::new()?;
+    let titles = reader.titles(&pids);
+    let started = std::time::Instant::now();
+    let elements = reader.read(&pids, &[], roster::MAX_ELEMENTS);
+    println!("{app}: {} windows, {} elements, read in {} ms", titles.len(), elements.len(), started.elapsed().as_millis());
+    for t in &titles {
+        println!("window: {t}");
+    }
+    println!();
+    for e in &elements {
+        let indent = " ".repeat(usize::from(e.depth.min(40)) * 2);
+        let id = if e.id.is_empty() { String::new() } else { format!(" [{}]", e.id) };
+        println!("{indent}{} \"{}\"{id}", e.kind, e.name.replace('\n', " "));
+    }
+    let seen = roster::read(&elements);
+    println!();
+    println!("speaking: {}", seen.speaking.join(", "));
+    println!("people: {}", seen.people.join(", "));
+    println!("you: {}", seen.own.join(", "));
+    for (who, what) in seen.captions.iter().rev().take(5).rev() {
+        println!("caption: {who}: {what}");
+    }
+    Ok(())
+}
 
 fn option(args: &[String], name: &str) -> Option<String> {
     args.iter().position(|a| a == name).and_then(|i| args.get(i + 1)).cloned()
@@ -183,6 +231,7 @@ fn run(args: &[String]) -> Result<(), String> {
             eprintln!("{:.1} s of sound heard in {:.1} s", sound.len() as f32 / 16_000.0, started.elapsed().as_secs_f32());
             Ok(())
         }
+        Some("call-window") => call_window(args),
         _ => Err(USAGE.into()),
     }
 }

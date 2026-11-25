@@ -47,6 +47,11 @@ cpal = "0.18.2"
 windows = { version = "0.62", default-features = false }
 winsafe = { version = "0.0.29" }
 winreg = "0.56"
+# Reading the meeting app's window as a screen reader does (who's speaking, the captions), through
+# a safe binding of Windows' UI Automation.
+# (Its default features: it builds only with them; RecallCraft clicks and types nothing. `event`:
+# a listener that does nothing, so Chromium apps such as the new Teams show their pages.)
+uiautomation = { version = "0.25.3", features = ["event"] }
 
 # ui
 egui = "0.36"

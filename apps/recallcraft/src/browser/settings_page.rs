@@ -169,6 +169,14 @@ pub fn show(ui: &mut egui::Ui, s: &mut Settings, st: &mut State, layout: &Layout
         ui.label(RichText::new("Their sound and transcript. 0 keeps them only as long as everything else; a call you keep (📌) stays until you delete it.").small().weak());
         ui.checkbox(&mut s.transcribe_calls, "Write down what's said during calls, as it's said");
         ui.checkbox(&mut s.separate_voices, "Tell the other people's voices apart (Speaker 1, Speaker 2, …)");
+        ui.checkbox(&mut s.names_from_app, "Name them from the meeting app (who it shows speaking, its captions)");
+        ui.label(
+            RichText::new(
+                "During a call, RecallCraft reads the meeting app's window as a screen reader would, about twice a second, for who's on                  the call and who's speaking, and names the voices after them. Turning on the app's live captions helps.",
+            )
+            .small()
+            .weak(),
+        );
         ui.checkbox(&mut s.browsers_are_calls, "A browser using the microphone is a call (Meet, Teams or Zoom in a browser)");
         ui.checkbox(&mut s.any_app_is_a_call, "Any program using the microphone is a call");
         ui.checkbox(&mut s.tray_dot, "A red dot on the tray icon while a call is recorded");

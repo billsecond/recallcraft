@@ -17,6 +17,11 @@ RecallCraft records sound around the clock, so it's built to keep that sound you
 - **Transcripts** are written only during calls, by the speech model on this computer, into the
   call's folder. Voices you name are kept as numbers describing the voice (no sound) in
   `%APPDATA%\RecallCraft\voices.json`.
+- **The meeting app's window**, during a call only, is read the way a screen reader reads it
+  (Windows' UI Automation): only the calling app's windows, about twice a second, and nothing in
+  them is clicked or changed. Kept, in the call's folder: the names of the people it showed on
+  the call, and when it showed each one speaking. The words of its captions aren't kept. Turn it
+  off with "Name them from the meeting app" (Settings › Calls).
 - **Nothing of what's recorded goes to the network.** No account, no cloud, no telemetry, no
   crash reports. Sharing is you exporting a file.
 - **The one network request is the update check.** A minute after RecallCraft starts, and then

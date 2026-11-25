@@ -22,6 +22,7 @@ use recallcraft_store::Layout;
 use recallcraft_store::calls::{CallStore, new_id};
 
 use crate::Shared;
+use crate::names::ToNames;
 use crate::recorder::ToHear;
 
 /// A call shorter than this, with nothing said, wasn't a call (an app trying its microphone).
@@ -210,7 +211,7 @@ fn titles_by_app(procs: &probe::Processes) -> HashMap<String, Vec<String>> {
     out
 }
 
-pub fn run(shared: &Shared, layout: &Layout, own_exe: &str, tx: Sender<Block>, hear: Sender<ToHear>) {
+pub fn run(shared: &Shared, layout: &Layout, own_exe: &str, tx: Sender<Block>, hear: Sender<ToHear>, names: Sender<ToNames>) {
     let calls = CallStore::new(&layout.calls());
     close_stale(&calls);
     let mut mic = Slot::new();
@@ -271,6 +272,7 @@ pub fn run(shared: &Shared, layout: &Layout, own_exe: &str, tx: Sender<Block>, h
                         Err(e) => log::warn!("saving the call: {e}"),
                     }
                     let _ = hear.send(ToHear::CallStarted { id: id.clone(), started_ms: at_ms });
+                    let _ = names.send(ToNames::Started { id: id.clone(), app_exe: app.exe.clone(), before: before.clone() });
                     current = Some(Current { id, app, before, during: Vec::new(), windows_at: None });
                 }
                 Event::Device { device_id } => log::info!("the call moved to another microphone ({device_id})"),
@@ -285,6 +287,7 @@ pub fn run(shared: &Shared, layout: &Layout, own_exe: &str, tx: Sender<Block>, h
                             log::info!("the call {} ended", c.id);
                         }
                         let _ = hear.send(ToHear::CallEnded { id: c.id, ended_ms: at_ms });
+                        let _ = names.send(ToNames::Ended);
                     }
                 }
             }
