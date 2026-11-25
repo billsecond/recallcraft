@@ -66,8 +66,9 @@ Nothing pops up when a call starts. There's a red dot on the tray icon while a c
 ## Privacy, and the people on your calls
 
 Everything recorded stays on this computer: there's no account, no cloud, no telemetry, and the
-speech is written down here too. The only thing RecallCraft asks the network for is whether
-there's a newer version (Settings › Updates; [PRIVACY.md](PRIVACY.md) says exactly what's sent). **In many places everyone on a call must agree to it being recorded.**
+speech is written down here too. The only things RecallCraft asks the network for are whether
+there's a newer version (Settings › Updates) and, if you choose one, a larger speech model
+(Settings › Calls); [PRIVACY.md](PRIVACY.md) says exactly what's sent. **In many places everyone on a call must agree to it being recorded.**
 That's yours to arrange. Pause recording from the tray (15 minutes, an hour, or until you resume)
 whenever you need to. See [PRIVACY.md](PRIVACY.md).
 

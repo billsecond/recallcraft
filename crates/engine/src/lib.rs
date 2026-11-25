@@ -69,6 +69,10 @@ pub struct Status {
     pub hearer: String,
     /// Seconds of speech waiting to be heard.
     pub waiting_s: f32,
+    /// The speech model hearing (Base, Small, Medium).
+    pub speech_model: String,
+    /// A chosen speech model on its way: how far, or why it couldn't be downloaded.
+    pub speech_download: String,
     /// Something the owner should know (a device that won't start).
     pub problems: Vec<String>,
     /// When this was written (ms since 1970).
@@ -91,6 +95,16 @@ pub struct Shared {
     /// computer's sound then has it in it, so it isn't recorded (it would be played again in the
     /// next replay) or written down as the others'.
     own_sound: Mutex<Vec<(u64, u64)>>,
+    /// Another speech model to hear with (its file, threads and name), taken up between calls.
+    next_model: Mutex<Option<NextModel>>,
+}
+
+/// A speech model to hear with.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct NextModel {
+    pub file: PathBuf,
+    pub threads: usize,
+    pub name: String,
 }
 
 /// The most stretches of RecallCraft's own sound remembered.
@@ -103,7 +117,18 @@ impl Shared {
             status: Mutex::new(Status::default()),
             stop: AtomicBool::new(false),
             own_sound: Mutex::new(Vec::new()),
+            next_model: Mutex::new(None),
         }
+    }
+
+    /// Hear with this model from now on: the hearer takes it up when no call is going on and
+    /// nothing is waiting to be heard (a call is written down by one model).
+    pub fn use_model(&self, next: NextModel) {
+        *self.next_model.lock().unwrap_or_else(PoisonError::into_inner) = Some(next);
+    }
+
+    pub(crate) fn take_model(&self) -> Option<NextModel> {
+        self.next_model.lock().unwrap_or_else(PoisonError::into_inner).take()
     }
 
     /// RecallCraft plays sound from `from_us` to `until_us` (joined to the stretch before when they

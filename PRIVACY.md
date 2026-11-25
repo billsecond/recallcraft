@@ -25,7 +25,8 @@ RecallCraft records sound around the clock, so it's built to keep that sound you
   off with "Name them from the meeting app" (Settings › Calls).
 - **Nothing of what's recorded goes to the network.** No account, no cloud, no telemetry, no
   crash reports. Sharing is you exporting a file.
-- **The one network request is the update check.** A minute after RecallCraft starts, and then
+- **Two network requests: the update check, and a larger speech model if you choose one.**
+- **The update check.** A minute after RecallCraft starts, and then
   every six hours (never during a call), it asks GitHub for its latest release
   (`https://api.github.com/repos/billsecond/recallcraft/releases/latest`). It's a plain HTTPS
   request that says only "RecallCraft" and its version: no identifier, no cookie, nothing about
@@ -36,6 +37,13 @@ RecallCraft records sound around the clock, so it's built to keep that sound you
   the release page opens if you ask. Turn it off with "Check for updates automatically"
   (Settings › Updates); Check now still works when you ask. The Flatpak has no network access, so
   it never checks.
+- **A larger speech model**, only if you choose Small or Medium (Settings › Calls › Speech
+  model; Base is installed with RecallCraft and is the default). It's downloaded once from
+  RecallCraft's `speech-models` release on GitHub
+  (`https://github.com/billsecond/recallcraft/releases/download/speech-models/…`) into
+  `models` in the data folder, and checked against the SHA-256 it was published with. The
+  request says only "RecallCraft" and its version. Choosing another model deletes it. The
+  Flatpak has no network access, so it can't download one.
 - **The log** has times, device and program names, and how long things took; never what was said.
 
 ## Telling, and pausing

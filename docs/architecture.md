@@ -74,6 +74,18 @@ separation, nine in ten and three lines). Names the owner or the title gave are 
 Chromium apps keep their accessibility tree built once it's been asked for, which costs them a
 little more work while they run.
 
+## The speech model (`crates/desktop/src/models.rs`, `apps/recallcraft/src/speech_model.rs`)
+
+Base is installed with RecallCraft. Small and Medium (Settings › Calls) are downloaded when
+chosen, on a thread of the service's, from the repository's `speech-models` release into
+`models` in the data folder, written to a `.part` file and checked against the SHA-256 in the
+code before it's renamed. How it goes is in `status.json` (`speech_download`), which the window's
+settings show (with Try again: `--fetch-speech-model`). Once it's there, the service hands it to
+the engine (`Shared::use_model`); the hearer takes it up when no call is going on and nothing is
+waiting to be heard, starting its worker again with it and more threads (Base two, Small three,
+Medium four, a quarter of the processor's at most). `status.json`'s `speech_model` says which one
+hears. Choosing another deletes the larger one not chosen.
+
 ## Hearing (`crates/engine/src/hearer.rs`, `crates/speech`)
 
 The recorder cuts each stream into utterances at pauses of 0.7 s (the background level is

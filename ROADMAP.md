@@ -36,7 +36,9 @@
 - [ ] Encryption at rest (Windows' data protection for the user), keys per file
 - [ ] A storage limit as well as a time limit
 - [ ] Transcribe any stretch of the last two days on request (not only calls)
-- [ ] Re-hear a call with a larger model (`small.en`) when the computer is idle
+- [x] A larger speech model to choose (Small, Medium), downloaded when chosen and checked
+- [ ] Re-hear a call with a larger model when the computer is idle
+- [ ] The graphics card for the speech model (the larger ones would be much quicker)
 - [ ] Mark a moment during a call (a shortcut), shown in its transcript
 - [ ] Edit a line of the transcript
 
