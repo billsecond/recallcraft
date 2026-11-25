@@ -96,6 +96,18 @@ impl Hearer {
         }
     }
 
+    /// Hears with another model from now on (the worker is started again with it when needed).
+    fn switch(&mut self, next: &crate::NextModel) {
+        match self {
+            Hearer::Child(c) => {
+                if c.set_model(next.file.clone(), next.threads) {
+                    log::info!("the hearer hears with {} from now on ({})", next.name, next.file.display());
+                }
+            }
+            Hearer::Here(_) | Hearer::Off(_) => {}
+        }
+    }
+
     /// Whether it can't hear just now, but may in a while (so the queue waits).
     fn waiting(&self) -> bool {
         matches!(self, Hearer::Child(c) if !c.may_start())
@@ -204,6 +216,14 @@ pub fn run(shared: &Shared, layout: &Layout, settings_dir: &Path, with: HearWith
             if let Some(st) = states.remove(&id) {
                 save_voices(&calls, &id, &st.book);
             }
+        }
+        // Another speech model chosen: taken up between calls, once everything said is heard.
+        if live.is_none()
+            && queue.is_empty()
+            && let Some(next) = shared.take_model()
+        {
+            hearer.switch(&next);
+            shared.update(|st| st.speech_model = next.name.clone());
         }
         shared.update(|st| {
             st.hearer = if s.transcribe_calls { hearer.state() } else { "off".to_string() };

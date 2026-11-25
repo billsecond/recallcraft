@@ -22,10 +22,13 @@ It runs all the time; a crash loses what was being said.
 - Every crash fix lands with a regression test.
 
 ## Recordings are private
-- **One network feature: the update check** (`crates/desktop/src/update.rs`, the service's side in
-  `apps/recallcraft/src/update.rs`), which the owner asked for: GitHub's latest release, nothing
-  about the owner sent, never during a call, off in Settings. No telemetry, nothing else. Adding
-  another network feature is the owner's decision.
+- **Two network features, both the owner asked for:** the update check
+  (`crates/desktop/src/update.rs`, the service's side in `apps/recallcraft/src/update.rs`):
+  GitHub's latest release, nothing about the owner sent, never during a call, off in Settings;
+  and a larger speech model, downloaded only when the owner chooses Small or Medium
+  (`crates/desktop/src/models.rs`, `apps/recallcraft/src/speech_model.rs`) from the repository's
+  `speech-models` release, checked against the SHA-256 in the code. No telemetry, nothing else.
+  Adding another network feature is the owner's decision.
 - Nothing of what was said is logged (times, sizes, device and program names only).
 - **Never record or play sound on the owner's computer without saying so first**, and never commit
   a recording. Tests use made-up sound; `crates/engine/examples/simulate.rs` plays a call made

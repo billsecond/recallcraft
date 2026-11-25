@@ -6,8 +6,9 @@ use egui::RichText;
 use recallcraft_audio::devices::{self, Device};
 use recallcraft_desktop::service::{self as signin, Status as SignIn};
 use recallcraft_desktop::{models, paths, version};
+use recallcraft_engine::Status;
 use recallcraft_model::settings::{MAX_KEEP_DAYS, MAX_KEEP_HOURS, MIN_KEEP_HOURS, SPEEDS};
-use recallcraft_model::{AudioExport, MicMode, RecordMode, Settings, TranscriptFormat};
+use recallcraft_model::{AudioExport, MicMode, RecordMode, Settings, SpeechModel, TranscriptFormat};
 use recallcraft_store::Layout;
 
 use super::Action;
@@ -27,6 +28,30 @@ pub struct State {
 enum Confirm {
     DeleteAll,
     ForgetVoices,
+}
+
+/// What the chosen speech model means, and how it's coming: downloading, or why it couldn't be,
+/// or which one hears until it takes over.
+fn speech_model_note(ui: &mut egui::Ui, chosen: SpeechModel, status: Option<&Status>, out: &mut Vec<Action>) {
+    let download = status.map_or("", |st| st.speech_download.as_str());
+    let hearing = status.map_or("", |st| st.speech_model.as_str());
+    if download.starts_with("Couldn't") {
+        ui.horizontal(|ui| {
+            ui.colored_label(super::style::AMBER, download);
+            if ui.button("Try again").clicked() {
+                out.push(Action::Tell(vec!["--fetch-speech-model".to_string()]));
+            }
+        });
+    } else if !download.is_empty() {
+        ui.label(download);
+    } else if !hearing.is_empty() && hearing != chosen.name() {
+        ui.label(format!("{} hears until {} takes over, once no call is going on.", hearing, chosen.name()));
+    }
+    let mut about = format!("{}: {}.", chosen.name(), chosen.about());
+    if chosen != SpeechModel::Base {
+        about.push_str(" It's downloaded from RecallCraft's page on GitHub and checked; nothing about you is sent. Choosing another deletes it.");
+    }
+    ui.label(RichText::new(about).small().weak());
 }
 
 fn section(ui: &mut egui::Ui, title: &str) {
@@ -106,7 +131,15 @@ fn updates(ui: &mut egui::Ui, s: &mut Settings, upd: Option<&Shared>, in_call: b
 }
 
 /// Shows the settings; true when one changed.
-pub fn show(ui: &mut egui::Ui, s: &mut Settings, st: &mut State, layout: &Layout, upd: Option<&Shared>, in_call: bool) -> (bool, Vec<Action>) {
+pub fn show(
+    ui: &mut egui::Ui,
+    s: &mut Settings,
+    st: &mut State,
+    layout: &Layout,
+    upd: Option<&Shared>,
+    status: Option<&Status>,
+) -> (bool, Vec<Action>) {
+    let in_call = status.is_some_and(Status::in_call);
     let before = s.clone();
     let mut out = Vec::new();
     egui::ScrollArea::vertical().id_salt("settings").auto_shrink([false, false]).show(ui, |ui| {
@@ -168,11 +201,20 @@ pub fn show(ui: &mut egui::Ui, s: &mut Settings, st: &mut State, layout: &Layout
         });
         ui.label(RichText::new("Their sound and transcript. 0 keeps them only as long as everything else; a call you keep (📌) stays until you delete it.").small().weak());
         ui.checkbox(&mut s.transcribe_calls, "Write down what's said during calls, as it's said");
+        ui.horizontal(|ui| {
+            ui.label("Speech model");
+            egui::ComboBox::from_id_salt("speech-model").width(90.0).selected_text(s.speech_model.name()).show_ui(ui, |ui| {
+                for m in SpeechModel::ALL {
+                    ui.selectable_value(&mut s.speech_model, m, format!("{}: {}", m.name(), m.about()));
+                }
+            });
+        });
+        speech_model_note(ui, s.speech_model, status, &mut out);
         ui.checkbox(&mut s.separate_voices, "Tell the other people's voices apart (Speaker 1, Speaker 2, …)");
         ui.checkbox(&mut s.names_from_app, "Name them from the meeting app (who it shows speaking, its captions)");
         ui.label(
             RichText::new(
-                "During a call, RecallCraft reads the meeting app's window as a screen reader would, about twice a second, for who's on                  the call and who's speaking, and names the voices after them. Turning on the app's live captions helps.",
+                "During a call, RecallCraft reads the meeting app's window as a screen reader would, about twice a second, for who's on the call and who's speaking, and names the voices after them. Turning on the app's live captions helps.",
             )
             .small()
             .weak(),

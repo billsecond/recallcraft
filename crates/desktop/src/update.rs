@@ -310,7 +310,51 @@ pub fn verify_or_delete(path: &Path, expected: &[u8; 32]) -> Result<(), String> 
 
 /// Saves what `r` gives as `dest` if its SHA-256 is `expected` and it is no larger than `max`:
 /// written to `dest.part` first and renamed once it has checked out, deleted otherwise.
-pub fn save_verified(mut r: impl Read, dest: &Path, max: u64, expected: &[u8; 32]) -> Result<u64, String> {
+pub fn save_verified(r: impl Read, dest: &Path, max: u64, expected: &[u8; 32]) -> Result<u64, String> {
+    save_verified_with(r, dest, max, expected, "installer", &mut |_| {}, &std::sync::atomic::AtomicBool::new(false))
+}
+
+#[cfg(test)]
+mod save_tests {
+    use std::sync::atomic::AtomicBool;
+
+    use super::*;
+
+    #[test]
+    fn a_download_tells_its_progress_and_can_be_stopped() {
+        let dir = std::env::temp_dir().join(format!("recallcraft-save-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let data = vec![7u8; 200_000];
+        let expected: [u8; 32] = ring::digest::digest(&ring::digest::SHA256, &data).as_ref().try_into().unwrap();
+        let dest = dir.join("model.gguf");
+        let mut seen = Vec::new();
+        let n = save_verified_with(&data[..], &dest, 1 << 20, &expected, "speech model", &mut |n| seen.push(n), &AtomicBool::new(false)).unwrap();
+        assert_eq!(n, 200_000);
+        assert_eq!(seen.last(), Some(&200_000));
+        assert!(seen.windows(2).all(|w| w[0] < w[1]));
+        std::fs::remove_file(&dest).unwrap();
+        // Stopped: nothing is left.
+        let r = save_verified_with(&data[..], &dest, 1 << 20, &expected, "speech model", &mut |_| {}, &AtomicBool::new(true));
+        assert_eq!(r, Err("the download was stopped".to_string()));
+        assert!(!dest.exists() && !dir.join("model.gguf.part").exists());
+        // The wrong file: said for what it is.
+        let r = save_verified_with(&data[..10], &dest, 1 << 20, &expected, "speech model", &mut |_| {}, &AtomicBool::new(false));
+        assert_eq!(r, Err("the downloaded speech model didn't match its checksum, so it was deleted".to_string()));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+}
+
+/// [`save_verified`] for a download of `what` (an installer, a speech model), telling `progress`
+/// the bytes so far, and given up when `cancel` is set.
+pub fn save_verified_with(
+    mut r: impl Read,
+    dest: &Path,
+    max: u64,
+    expected: &[u8; 32],
+    what: &str,
+    progress: &mut dyn FnMut(u64),
+    cancel: &std::sync::atomic::AtomicBool,
+) -> Result<u64, String> {
     let mut part_name = dest.as_os_str().to_owned();
     part_name.push(".part");
     let part = PathBuf::from(part_name);
@@ -320,6 +364,9 @@ pub fn save_verified(mut r: impl Read, dest: &Path, max: u64, expected: &[u8; 32
         let mut buf = vec![0u8; 64 * 1024];
         let mut total = 0u64;
         loop {
+            if cancel.load(std::sync::atomic::Ordering::SeqCst) {
+                return Err("the download was stopped".to_string());
+            }
             let n = match r.read(&mut buf) {
                 Ok(0) => break,
                 Ok(n) => n,
@@ -328,18 +375,19 @@ pub fn save_verified(mut r: impl Read, dest: &Path, max: u64, expected: &[u8; 32
             };
             total = total.saturating_add(u64::try_from(n).unwrap_or(u64::MAX));
             if total > max {
-                return Err("the download was larger than an installer can be".to_string());
+                return Err(format!("the download was larger than the {what} can be"));
             }
             let chunk = buf.get(..n).unwrap_or_default();
             ctx.update(chunk);
             f.write_all(chunk).map_err(|e| format!("{}: {e}", part.display()))?;
+            progress(total);
         }
         f.flush().map_err(|e| format!("{}: {e}", part.display()))?;
         drop(f);
         let got = ctx.finish();
         if got.as_ref() != expected.as_slice() {
             log::warn!("the download didn't match its checksum ({} instead of {})", hex(got.as_ref()), hex(expected));
-            return Err("the downloaded installer didn't match its checksum, so it was deleted".to_string());
+            return Err(format!("the downloaded {what} didn't match its checksum, so it was deleted"));
         }
         std::fs::rename(&part, dest).map_err(|e| format!("{}: {e}", dest.display()))?;
         Ok(total)
@@ -358,7 +406,7 @@ pub fn user_agent() -> String {
 }
 
 /// An HTTPS-only client with no cookies, giving up after `total`.
-fn agent(total: Duration) -> ureq::Agent {
+pub(crate) fn agent(total: Duration) -> ureq::Agent {
     let config = ureq::Agent::config_builder()
         .https_only(true)
         .user_agent(user_agent())
@@ -371,7 +419,7 @@ fn agent(total: Duration) -> ureq::Agent {
 }
 
 /// A network failure in plain words.
-fn plain(e: ureq::Error) -> String {
+pub(crate) fn plain(e: ureq::Error) -> String {
     match e {
         ureq::Error::StatusCode(403 | 429) => "GitHub is limiting requests from this network for now".to_string(),
         ureq::Error::StatusCode(404) => "GitHub has no release of RecallCraft".to_string(),

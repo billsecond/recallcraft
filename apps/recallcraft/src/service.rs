@@ -19,8 +19,7 @@ use std::time::{Duration, Instant, SystemTime};
 use global_hotkey::{GlobalHotKeyEvent, HotKeyState};
 use recallcraft_audio::playback::{Player, RingSource};
 use recallcraft_desktop::icon::{self, Look};
-use recallcraft_desktop::{instance, logging, models, paths, service as signin, settings as prefs, version};
-use recallcraft_engine::worker::HearWith;
+use recallcraft_desktop::{instance, logging, paths, service as signin, settings as prefs, version};
 use recallcraft_engine::{Config, Engine};
 use recallcraft_model::{RecordMode, Settings, time};
 use recallcraft_store::Layout;
@@ -34,6 +33,7 @@ use winit::window::WindowId;
 
 use crate::hotkeys::{Registered, Target};
 use crate::replay::ReplayState;
+use crate::speech_model::Chooser;
 use crate::update::{Asker, Updates};
 
 /// How long sound stopped a moment ago is still coming out of the speaker (its buffer).
@@ -89,25 +89,12 @@ struct ServiceApp {
     status_text: String,
     quitting: bool,
     updates: Updates,
+    /// The speech model chosen, downloaded when it isn't here.
+    speech: Chooser,
 }
 
 fn icon(look: Look) -> Option<tray_icon::Icon> {
     tray_icon::Icon::from_rgba(icon::pixels(32, look), 32, 32).inspect_err(|e| log::warn!("tray icon: {e}")).ok()
-}
-
-/// How the engine hears: the worker program, if there's a model.
-fn hear_with() -> HearWith {
-    match (std::env::current_exe(), models::speech_model()) {
-        (Ok(exe), Ok(model)) => {
-            let cores = std::thread::available_parallelism().map_or(2, |n| n.get());
-            HearWith::Program { exe, args: vec!["--hear".to_string()], model, threads: (cores / 4).clamp(1, 2) }
-        }
-        (_, Err(e)) => {
-            log::warn!("{e}; what's said won't be written down");
-            HearWith::Off("no speech model".to_string())
-        }
-        (Err(e), _) => HearWith::Off(e.to_string()),
-    }
 }
 
 /// Started by the owner while nothing runs: the service is started under the supervisor
@@ -186,13 +173,16 @@ pub fn run(args: &[String]) -> ExitCode {
         }
     }
     let layout = Layout::new(paths::data_dir(&settings));
+    let speech = Chooser::new(&layout.root);
+    let (hear, hearing_with) = speech.hear_with(settings.speech_model);
     let config = Config {
         data_dir: layout.root.clone(),
         settings_dir: paths::settings_dir().unwrap_or_else(|| layout.root.join("settings")),
-        hear: hear_with(),
+        hear,
         own_exe: std::env::current_exe().ok().and_then(|p| p.file_name().map(|n| n.to_string_lossy().to_string())).unwrap_or_default(),
     };
     let engine = Engine::start(config, settings.clone());
+    engine.shared.update(|s| s.speech_model = hearing_with.to_string());
     let event_loop = match EventLoop::<Msg>::with_user_event().build() {
         Ok(l) => l,
         Err(e) => {
@@ -241,6 +231,7 @@ pub fn run(args: &[String]) -> ExitCode {
         status_text: String::new(),
         quitting: false,
         updates: Updates::new(),
+        speech,
     };
     let r = event_loop.run_app(&mut app);
     app.shut_down();
@@ -443,6 +434,12 @@ impl ServiceApp {
                 "--settings" => self.open(true),
                 "--replay" => self.replay(),
                 "--stop-replay" => self.stop_replay("stopped"),
+                "--fetch-speech-model" => {
+                    // Try the chosen model's download again (the window's Try again).
+                    if let Some(e) = &self.engine {
+                        self.speech.sync(self.settings.speech_model, true, &e.shared);
+                    }
+                }
                 "--pause" => {
                     let minutes: u64 = it.next().and_then(|m| m.parse().ok()).unwrap_or(0);
                     self.pause(minutes);
@@ -572,6 +569,10 @@ impl ServiceApp {
             self.replay_bar = None;
         }
         self.sync_replay_item();
+        if let Some(e) = &self.engine {
+            self.speech.sync(self.settings.speech_model, false, &e.shared);
+            self.speech.tick(&e.shared);
+        }
         if let Some(c) = self.window.as_mut()
             && !matches!(c.try_wait(), Ok(None))
         {
@@ -661,6 +662,7 @@ impl ServiceApp {
 
     fn shut_down(&mut self) {
         self.stop_replay("stopped");
+        self.speech.shut_down();
         self.updates.shut_down();
         if self.quitting {
             self.close_window();

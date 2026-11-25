@@ -29,6 +29,7 @@ mod graphics;
 mod hotkeys;
 mod replay;
 mod service;
+mod speech_model;
 mod update;
 
 use std::process::ExitCode;

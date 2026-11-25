@@ -1,6 +1,10 @@
-## RecallCraft 0.4
+## RecallCraft 0.5
 
 The last two days of what you heard and said, every call written down as it happens, all on your own computer.
+
+**New in 0.5**
+
+- **A larger speech model, if you want one.** Settings › Calls › Speech model: **Base** (installed, the quickest), **Small** (hears better; a 270 MB download, about three times the work) or **Medium** (hears best; an 830 MB download, about ten times the work, for a fast processor). The one you choose is downloaded once from RecallCraft's page on GitHub and checked; Base hears until it's there, and it takes over between calls. Choosing another deletes it.
 
 **New in 0.4.1**
 
@@ -11,7 +15,7 @@ The last two days of what you heard and said, every call written down as it happ
 - **Names from the meeting app.** During a call, RecallCraft reads the meeting app's window the way a screen reader does. It sees who's on the call, who the app shows speaking, and who said each line in the app's live captions. A voice whose lines keep coming while the app shows the same person speaking is named after them, so *Speaker 2* becomes *Jane Doe*. A name you gave is never replaced. The call's page lists who the app showed in the meeting, and search finds calls by those names. Turning on the app's live captions helps. Turn it off in Settings › Calls.
 - **`recallcraft-cli call-window`**, run during a call, shows what the meeting app's window tells RecallCraft. It's for when names don't appear.
 
-**Coming from 0.3:** RecallCraft offers this update by itself (or choose Check for Updates… in the tray). **Coming from 0.2:** 0.2 can't update itself, so install 0.4 over it once (the MSI upgrades it in place; for the portable zip, unzip over the old folder). From then on, updates come to you.
+**Coming from 0.3 or 0.4:** RecallCraft offers this update by itself (or choose Check for Updates… in the tray). **Coming from 0.2:** 0.2 can't update itself, so install 0.5 over it once (the MSI upgrades it in place; for the portable zip, unzip over the old folder). From then on, updates come to you.
 
 **New in 0.3**
 
@@ -32,7 +36,7 @@ The last two days of what you heard and said, every call written down as it happ
 - **Live transcript.** Whisper runs on your computer, in a program of its own at below-normal priority, only on what's said during calls; the others are told apart by their voices.
 - **Replay** the last 30 seconds at 1.5× (Ctrl+Alt+R), **browse** the calls by day, **search** what was said, and **export** the sound (WAV, stereo WAV, Opus) and the transcript (text, Markdown, SubRip, WebVTT, JSON).
 
-**Early alpha.** The foundations are in place and tested; see the [README](https://github.com/GITHUB_REPOSITORY#readme) and the roadmap for what's next. **In many places everyone on a call must agree to it being recorded: that is yours to arrange.** Nothing you record leaves your computer: there's no account, no cloud, no telemetry. The only network request is the update check, which asks GitHub for the latest release and sends nothing about you (turn it off in Settings › Updates).
+**Early alpha.** The foundations are in place and tested; see the [README](https://github.com/GITHUB_REPOSITORY#readme) and the roadmap for what's next. **In many places everyone on a call must agree to it being recorded: that is yours to arrange.** Nothing you record leaves your computer: there's no account, no cloud, no telemetry. The only network requests are the update check, which asks GitHub for the latest release and sends nothing about you (turn it off in Settings › Updates), and a larger speech model if you choose one.
 
 RecallCraft for Windows, macOS, Linux and FreeBSD. Every file is listed with its SHA-256 in `SHA256SUMS.txt`. **Windows is where RecallCraft records both sides of a call and finds calls on its own;** on macOS, Linux and FreeBSD it records the microphone, and the rest isn't done there yet.
 

@@ -3,6 +3,74 @@
 
 use serde::{Deserialize, Serialize};
 
+/// The speech model that writes down what's said: Whisper, English only, in three sizes. Base is
+/// installed with RecallCraft; Small and Medium are downloaded when chosen. Kept as `base`,
+/// `small` or `medium`; anything else reads as [`SpeechModel::Base`].
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(from = "String", into = "String")]
+pub enum SpeechModel {
+    #[default]
+    Base,
+    Small,
+    Medium,
+}
+
+impl SpeechModel {
+    pub const ALL: [SpeechModel; 3] = [SpeechModel::Base, SpeechModel::Small, SpeechModel::Medium];
+
+    pub fn name(self) -> &'static str {
+        match self {
+            SpeechModel::Base => "Base",
+            SpeechModel::Small => "Small",
+            SpeechModel::Medium => "Medium",
+        }
+    }
+
+    /// Its file, in the models folder.
+    pub fn file(self) -> &'static str {
+        match self {
+            SpeechModel::Base => "whisper-base.en-q8_0.gguf",
+            SpeechModel::Small => "whisper-small.en-q8_0.gguf",
+            SpeechModel::Medium => "whisper-medium.en-q8_0.gguf",
+        }
+    }
+
+    /// What choosing it means, in a few words.
+    pub fn about(self) -> &'static str {
+        match self {
+            SpeechModel::Base => "installed with RecallCraft; the quickest",
+            SpeechModel::Small => "hears better; a 270 MB download, about three times the work",
+            SpeechModel::Medium => "hears best; an 830 MB download, about ten times the work (for a fast processor)",
+        }
+    }
+
+    /// How many of the processor's threads it hears on (of `cores`), at below-normal priority.
+    pub fn threads(self, cores: usize) -> usize {
+        let most = match self {
+            SpeechModel::Base => 2,
+            SpeechModel::Small => 3,
+            SpeechModel::Medium => 4,
+        };
+        (cores / 4).clamp(1, most)
+    }
+}
+
+impl From<String> for SpeechModel {
+    fn from(s: String) -> SpeechModel {
+        match s.trim() {
+            "small" => SpeechModel::Small,
+            "medium" => SpeechModel::Medium,
+            _ => SpeechModel::Base,
+        }
+    }
+}
+
+impl From<SpeechModel> for String {
+    fn from(m: SpeechModel) -> String {
+        m.name().to_ascii_lowercase()
+    }
+}
+
 /// What's recorded. Kept as `always` or `calls_only`; anything else (a mode a later version
 /// writes) reads as [`RecordMode::Always`], and the other settings stay.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -189,6 +257,8 @@ pub struct Settings {
     /// Name the voices from the meeting app's window during a call (who it shows speaking, its
     /// captions' speakers), read as a screen reader reads it.
     pub names_from_app: bool,
+    /// The speech model that writes down what's said.
+    pub speech_model: SpeechModel,
     /// A browser using the microphone is a call (Meet, Teams or Zoom in a browser).
     pub browsers_are_calls: bool,
     /// Any program using the microphone is a call.
@@ -231,6 +301,7 @@ impl Default for Settings {
             transcribe_calls: true,
             separate_voices: true,
             names_from_app: true,
+            speech_model: SpeechModel::Base,
             browsers_are_calls: true,
             any_app_is_a_call: false,
             more_call_apps: Vec::new(),
@@ -348,6 +419,20 @@ mod tests {
         assert!(s.recording_at(5000));
         let off = Settings { recording: false, ..Settings::default() };
         assert!(!off.recording_at(u64::MAX));
+    }
+
+    #[test]
+    fn the_speech_model_reads_back_and_defaults_to_base() {
+        for m in SpeechModel::ALL {
+            let s = Settings { speech_model: m, ..Settings::default() };
+            assert_eq!(Settings::from_json(&serde_json::to_string(&s).unwrap()).speech_model, m);
+        }
+        assert_eq!(Settings::default().speech_model, SpeechModel::Base);
+        let odd = Settings::from_json(r#"{"speech_model": "huge", "keep_audio_hours": 12}"#);
+        assert_eq!((odd.speech_model, odd.keep_audio_hours), (SpeechModel::Base, 12), "one it doesn't know is Base; the rest stays");
+        assert_eq!(SpeechModel::Medium.threads(24), 4);
+        assert_eq!(SpeechModel::Base.threads(24), 2);
+        assert_eq!(SpeechModel::Small.threads(2), 1);
     }
 
     #[test]

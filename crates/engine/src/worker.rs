@@ -224,6 +224,20 @@ impl ChildHear {
         }
     }
 
+    /// Hears with the model `model` on `threads` threads from now on; false if that's already it.
+    pub fn set_model(&mut self, model: PathBuf, threads: usize) -> bool {
+        let threads = threads.clamp(1, 8);
+        if model == self.model && threads == self.threads {
+            return false;
+        }
+        self.stop_child();
+        self.model = model;
+        self.threads = threads;
+        self.failed = None;
+        self.model_name.clear();
+        true
+    }
+
     /// Whether it may be started (not within a minute of failing).
     pub fn may_start(&self) -> bool {
         self.failed.as_ref().is_none_or(|(_, at)| at.elapsed() > Duration::from_secs(60))
@@ -302,6 +316,16 @@ mod tests {
         short.extend_from_slice(&4u32.to_le_bytes());
         short.extend_from_slice(&[0u8; 5]);
         assert!(read_request(&mut std::io::Cursor::new(short)).is_err());
+    }
+
+    #[test]
+    fn another_model_is_taken_up_only_when_it_differs() {
+        let mut c = ChildHear::new(PathBuf::from("recallcraft"), Vec::new(), PathBuf::from("base.gguf"), 2);
+        assert!(!c.set_model(PathBuf::from("base.gguf"), 2));
+        c.failed = Some(("it failed".to_string(), Instant::now()));
+        assert!(c.set_model(PathBuf::from("small.gguf"), 3));
+        assert!(c.failed.is_none() && c.may_start(), "a new model is tried straight away");
+        assert!(c.set_model(PathBuf::from("small.gguf"), 4), "more threads");
     }
 
     #[test]

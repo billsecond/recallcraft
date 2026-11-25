@@ -679,9 +679,8 @@ impl eframe::App for Browser {
             match self.page.clone() {
                 Page::Settings => {
                     let layout = self.layout.clone();
-                    let in_call = self.status.as_ref().is_some_and(Status::in_call);
                     let (changed, acts) =
-                        settings_page::show(ui, &mut self.settings, &mut self.settings_state, &layout, self.updates.as_ref(), in_call);
+                        settings_page::show(ui, &mut self.settings, &mut self.settings_state, &layout, self.updates.as_ref(), self.status.as_ref());
                     if changed {
                         let s = self.settings.clone();
                         self.settings = prefs::update(|x| *x = s);
