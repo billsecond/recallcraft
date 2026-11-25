@@ -1,14 +1,19 @@
-## RecallCraft 0.3
+## RecallCraft 0.4
 
 The last two days of what you heard and said, every call written down as it happens, all on your own computer.
+
+**New in 0.4**
+
+- **Names from the meeting app.** During a call, RecallCraft reads the meeting app's window the way a screen reader does. It sees who's on the call, who the app shows speaking, and who said each line in the app's live captions. A voice whose lines keep coming while the app shows the same person speaking is named after them, so *Speaker 2* becomes *Jane Doe*. A name you gave is never replaced. The call's page lists who the app showed in the meeting, and search finds calls by those names. Turning on the app's live captions helps. Turn it off in Settings › Calls.
+- **`recallcraft-cli call-window`**, run during a call, shows what the meeting app's window tells RecallCraft. It's for when names don't appear.
+
+**Coming from 0.3:** RecallCraft offers this update by itself (or choose Check for Updates… in the tray). **Coming from 0.2:** 0.2 can't update itself, so install 0.4 over it once (the MSI upgrades it in place; for the portable zip, unzip over the old folder). From then on, updates come to you.
 
 **New in 0.3**
 
 - **The other side of every call.** RecallCraft now records what your speakers or headset play the way ScreenGrabCraft does: from the speaker itself (the default one, or the one the call plays on). The other people on a Teams, Zoom or Slack call are heard and written down; 0.2 could miss them. RecallCraft's own replays are kept out of the transcript.
 - **Updates, without the hunting.** RecallCraft checks for a new version a minute after it starts and every six hours, never during a call. On Windows it downloads the update and checks it against the release's checksums, then offers it in a small notice, the tray menu and Settings › Updates. **Update now** installs it and RecallCraft starts again. This works for the installer and the portable zip. Pressed during a call, it waits for the call to end. Turn the checks off in Settings › Updates.
 - **Every system, for real.** 0.2's release had only the Windows x64 files. This one has the installers and packages for Windows (x64, x86, ARM64), macOS, Linux and FreeBSD.
-
-**Coming from 0.2:** 0.2 can't update itself, so install 0.3 over it once (the MSI upgrades it in place; for the portable zip, unzip over the old folder). From 0.3 on, updates come to you.
 
 **New in 0.2**
 

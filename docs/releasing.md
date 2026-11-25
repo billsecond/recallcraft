@@ -1,6 +1,6 @@
 # Releasing RecallCraft
 
-> **Last reviewed:** 2026-11-24 · **Last updated:** 2026-11-24 · **Change:** major (first version: the packaging scripts and the release workflow, ported from ScreenGrabCraft's) · **Status:** the release workflow ran for 0.2.0: every system's packages built, and the Windows x64 install test stopped the publishing (it read a sign-in key the uninstall had removed; fixed for 0.3.0). Automatic updates are described below; the first release that has them is 0.3.0.
+> **Last reviewed:** 2026-11-24 · **Last updated:** 2026-11-24 · **Change:** major (first version: the packaging scripts and the release workflow, ported from ScreenGrabCraft's) · **Status:** 0.3.0 was published with every system's files (22). The 0.2.0 run had built them all, and the Windows x64 install test stopped the publishing; it read a sign-in key the uninstall had removed. Automatic updates are described below. 0.3.0 is the first release that has them, and 0.4.0 is the first one offered through them.
 
 The canonical recipe is [craftrules `release/playbook.md`](https://github.com/storytold/craftrules/blob/main/release/playbook.md);
 this file has the RecallCraft specifics. The scripts in `packaging/` are ScreenGrabCraft's with
@@ -281,5 +281,6 @@ need fixing on its first run.
 
 | Date | Change |
 |---|---|
+| 2026-11-24 | Status: 0.3.0 published for every system; 0.4.0 is the first release offered through the updates |
 | 2026-11-24 | Automatic updates: what the update check relies on in a release, how an MSI copy and a portable copy update and start again |
 | 2026-11-24 | First version: packaging for Windows, macOS, Linux and FreeBSD from ScreenGrabCraft's; the speech model in every package; starting at sign-in per person; a release workflow of RecallCraft's own; what has and hasn't been checked |

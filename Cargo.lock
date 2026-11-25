@@ -3562,7 +3562,7 @@ checksum = "03251193000f4bd3b042892be858ee50e8b3719f2b08e5833ac4353724632430"
 
 [[package]]
 name = "recallcraft"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "eframe",
  "egui",
@@ -3585,7 +3585,7 @@ dependencies = [
 
 [[package]]
 name = "recallcraft-audio"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "cpal",
  "log",
@@ -3597,7 +3597,7 @@ dependencies = [
 
 [[package]]
 name = "recallcraft-calls"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "log",
  "uiautomation",
@@ -3607,7 +3607,7 @@ dependencies = [
 
 [[package]]
 name = "recallcraft-cli"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "log",
  "recallcraft-calls",
@@ -3621,7 +3621,7 @@ dependencies = [
 
 [[package]]
 name = "recallcraft-desktop"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "dirs",
  "getrandom 0.3.4",
@@ -3638,7 +3638,7 @@ dependencies = [
 
 [[package]]
 name = "recallcraft-engine"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "log",
  "recallcraft-audio",
@@ -3652,7 +3652,7 @@ dependencies = [
 
 [[package]]
 name = "recallcraft-model"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "jiff",
  "serde",
@@ -3661,7 +3661,7 @@ dependencies = [
 
 [[package]]
 name = "recallcraft-speech"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "bytemuck",
  "candle-core",
@@ -3675,7 +3675,7 @@ dependencies = [
 
 [[package]]
 name = "recallcraft-store"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "log",
  "recallcraft-model",
@@ -5541,7 +5541,7 @@ checksum = "e450f9b2ed1dff33c94c12589a87338689467b9c4f5d8a5710bd09a847d2c8a7"
 
 [[package]]
 name = "xtask"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "png",
  "recallcraft-desktop",
