@@ -2,7 +2,9 @@
 //! and nothing said when a call starts (a dot on the tray icon, if the settings want it).
 //!
 //! - The tray icon opens the window (a click), and its menu has Replay, Pause and Settings.
-//! - The Replay shortcut plays the last seconds again, at speed; pressed again, it stops.
+//! - The Replay shortcut plays the last seconds again, at speed, and stops when it has played
+//!   them; pressed again, it stops sooner, and so does the replay bar's Stop
+//!   (`recallcraft --replay-bar`) or the tray's Stop Replay. What it plays isn't recorded.
 //! - The window is a program of its own (`recallcraft --window`), started by the service so its
 //!   sound is one of the service's own, left out of the recording.
 //! - A later start (`recallcraft --replay`, the Start menu) hands its arguments over
@@ -31,7 +33,11 @@ use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
 use winit::window::WindowId;
 
 use crate::hotkeys::{Registered, Target};
+use crate::replay::ReplayState;
 use crate::update::{Asker, Updates};
+
+/// How long sound stopped a moment ago is still coming out of the speaker (its buffer).
+const SPEAKER_TAIL_US: u64 = 500_000;
 
 /// What wakes the service.
 #[derive(Debug)]
@@ -72,6 +78,10 @@ struct ServiceApp {
     items: Option<Items>,
     keys: Option<Registered>,
     replay: Option<Player>,
+    /// The replay going on, as the replay bar is told it.
+    replay_state: ReplayState,
+    replay_bar: Option<Child>,
+    replay_label: String,
     window: Option<Child>,
     pending: Vec<Vec<String>>,
     look: Option<Look>,
@@ -221,6 +231,9 @@ pub fn run(args: &[String]) -> ExitCode {
         items: None,
         keys: None,
         replay: None,
+        replay_state: ReplayState::default(),
+        replay_bar: None,
+        replay_label: String::new(),
         window: None,
         pending,
         look: None,
@@ -340,10 +353,11 @@ impl ServiceApp {
         }
     }
 
-    /// Plays the last seconds again; a second press stops it.
+    /// Plays the last seconds again, up to the moment it was asked for, and stops; asked again
+    /// while it plays, it stops sooner.
     fn replay(&mut self) {
-        if self.replay.take().is_some() {
-            log::info!("replay stopped");
+        if self.replay.is_some() {
+            self.stop_replay("stopped");
             return;
         }
         let s = &self.settings;
@@ -355,14 +369,69 @@ impl ServiceApp {
                 p.set_live(true);
                 p.play_from(from, Some(now));
                 log::info!("replaying the last {} s at {}×", s.replay_seconds, s.replay_speed);
-                // What it plays is in the computer's sound for that long: not the others'.
+                // What it plays is in the computer's sound for that long: it isn't recorded, or
+                // it would be in the next replay (cut short when it stops).
                 let lasts = (f64::from(s.replay_seconds) / f64::from(s.replay_speed.max(0.5)) * 1_000_000.0) as u64;
                 if let Some(e) = &self.engine {
                     e.shared.playing(now, now + lasts + 2_000_000);
                 }
                 self.replay = Some(p);
+                self.replay_state = ReplayState {
+                    id: now,
+                    playing: true,
+                    seconds: s.replay_seconds,
+                    speed: s.replay_speed,
+                    started_ms: now / 1000,
+                    lasts_ms: lasts / 1000,
+                };
+                crate::replay::write(&self.replay_state);
+                self.show_replay_bar();
             }
             Err(e) => log::warn!("replay: {e}"),
+        }
+    }
+
+    /// The replay ends (it played what it was asked to, or was stopped).
+    fn stop_replay(&mut self, how: &str) {
+        if self.replay.take().is_none() {
+            return;
+        }
+        log::info!("replay {how}");
+        if let Some(e) = &self.engine {
+            e.shared.stopped_playing(time::now_us() + SPEAKER_TAIL_US);
+        }
+        self.replay_state.playing = false;
+        crate::replay::write(&self.replay_state);
+    }
+
+    /// The bar that shows the replay, with its Stop (a bar that's up follows the next replay).
+    fn show_replay_bar(&mut self) {
+        if let Some(c) = self.replay_bar.as_mut()
+            && matches!(c.try_wait(), Ok(None))
+        {
+            return;
+        }
+        let Ok(exe) = std::env::current_exe() else { return };
+        match Command::new(exe).arg("--replay-bar").stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null()).spawn() {
+            Ok(c) => self.replay_bar = Some(c),
+            Err(e) => {
+                log::warn!("showing the replay bar: {e}");
+                self.replay_bar = None;
+            }
+        }
+    }
+
+    /// The tray's Replay item: Stop Replay while one plays.
+    fn sync_replay_item(&mut self) {
+        let key = self.settings.replay_hotkey.trim();
+        let what =
+            if self.replay.is_some() { "Stop Replay".to_string() } else { format!("Replay the last {} seconds", self.settings.replay_seconds) };
+        let label = if key.is_empty() { what } else { format!("{what}\t{key}") };
+        if label != self.replay_label
+            && let Some(i) = &self.items
+        {
+            i.replay.set_text(&label);
+            self.replay_label = label;
         }
     }
 
@@ -373,6 +442,7 @@ impl ServiceApp {
                 "--open" | "--show" => self.open(false),
                 "--settings" => self.open(true),
                 "--replay" => self.replay(),
+                "--stop-replay" => self.stop_replay("stopped"),
                 "--pause" => {
                     let minutes: u64 = it.next().and_then(|m| m.parse().ok()).unwrap_or(0);
                     self.pause(minutes);
@@ -386,6 +456,12 @@ impl ServiceApp {
                         && until > now
                     {
                         e.shared.playing(now.saturating_sub(500_000), until.min(now + 60_000_000));
+                    }
+                }
+                "--own-sound-stopped" => {
+                    // The window stopped playing.
+                    if let Some(e) = &self.engine {
+                        e.shared.stopped_playing(time::now_us() + SPEAKER_TAIL_US);
                     }
                 }
                 "--check-updates" => {
@@ -481,8 +557,21 @@ impl ServiceApp {
         }
         self.settings_changed();
         if self.replay.as_ref().is_some_and(Player::finished) {
-            self.replay = None;
+            self.stop_replay("ended");
         }
+        // Still playing (it can take longer than it was meant to): still not recorded.
+        if self.replay.is_some()
+            && let Some(e) = &self.engine
+        {
+            let now = time::now_us();
+            e.shared.playing(now, now + 2_000_000);
+        }
+        if let Some(c) = self.replay_bar.as_mut()
+            && !matches!(c.try_wait(), Ok(None))
+        {
+            self.replay_bar = None;
+        }
+        self.sync_replay_item();
         if let Some(c) = self.window.as_mut()
             && !matches!(c.try_wait(), Ok(None))
         {
@@ -541,9 +630,6 @@ impl ServiceApp {
                 i.status.set_text(&text);
                 i.resume.set_enabled(paused);
                 i.pause.set_enabled(!paused || self.settings.recording);
-                let replay = format!("Replay the last {} seconds", self.settings.replay_seconds);
-                let key = self.settings.replay_hotkey.trim();
-                i.replay.set_text(if key.is_empty() { replay } else { format!("{replay}\t{key}") });
             }
             self.status_text = text.clone();
         }
@@ -574,7 +660,7 @@ impl ServiceApp {
     }
 
     fn shut_down(&mut self) {
-        self.replay = None;
+        self.stop_replay("stopped");
         self.updates.shut_down();
         if self.quitting {
             self.close_window();

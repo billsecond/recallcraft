@@ -232,6 +232,9 @@ pub fn show(
         if ui.button(if playing { "⏸ Pause" } else { "▶ Play" }).clicked() {
             out.push(if pos.is_some() { Action::Toggle } else { play_from(start) });
         }
+        if pos.is_some() && ui.button("⏹ Stop").clicked() {
+            out.push(Action::Stop);
+        }
         if ui.button("15 s ⏩").clicked() {
             out.push(if pos.is_some() { Action::Seek((at + 15_000).min(end)) } else { play_from(start) });
         }
@@ -256,19 +259,14 @@ pub fn show(
             v.mix = mix;
             out.push(Action::Mix(mix));
         }
-        if live {
-            if ui
+        if live
+            && ui
                 .button("⏪ Catch up")
-                .on_hover_text(format!("Play the last {} seconds, faster, until it's caught up", settings.replay_seconds))
+                .on_hover_text(format!("Play the last {} seconds again, faster; it stops when it's caught up", settings.replay_seconds))
                 .clicked()
-            {
-                out.push(Action::Speed(settings.replay_speed.max(settings.playback_speed)));
-                out.push(Action::Play { at_ms: now.saturating_sub(u64::from(settings.replay_seconds) * 1000), end_ms: None, live: true });
-            }
-            if ui.button(RichText::new("● Live").color(style::RED)).on_hover_text("Listen from a few seconds ago").clicked() {
-                out.push(Action::Speed(1.0));
-                out.push(Action::Play { at_ms: now.saturating_sub(4000), end_ms: None, live: true });
-            }
+        {
+            out.push(Action::Speed(settings.replay_speed.max(settings.playback_speed)));
+            out.push(Action::Play { at_ms: now.saturating_sub(u64::from(settings.replay_seconds) * 1000), end_ms: None, live: true });
         }
     });
 

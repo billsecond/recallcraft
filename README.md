@@ -47,8 +47,11 @@ Speaker 2  0:13   Great. Can you walk us through what is left before the release
 - **Live transcript.** Whisper runs on your computer, in a program of its own at below-normal
   priority, only on what's said during calls. A minute of call takes about four seconds to hear.
 - **Replay.** Ctrl+Alt+R (or the tray menu) plays the last 30 seconds again at 1.5×, without
-  changing the voices' pitch; pressed again, it stops. In the window, **Catch up** plays a live
-  call from 30 seconds back, fast, until it's caught up; **Live** listens from a few seconds ago.
+  changing the voices' pitch, and stops when it has played them. A bar at the bottom of the
+  screen shows how far it has got, with a **Stop**; pressing the shortcut again, or the tray's
+  Stop Replay, stops it too. How far back it goes and how fast are in Settings › Replay. In the
+  window, **Catch up** plays a live call's last 30 seconds the same way. What RecallCraft plays
+  isn't recorded, so a replay is never in the next one.
 - **Browse.** The window lists the calls by day. A call shows who was on it (click to name them),
   its sound with each side's activity along it, and its transcript: click a line to play from
   there; the line playing is marked. Search finds what was said in any call. **Everything** shows
@@ -82,7 +85,8 @@ does. `recallcraft service install` arranges it by hand.
 
 ```text
 recallcraft                      start (or open the window of the one running)
-recallcraft --replay             play the last seconds again
+recallcraft --replay             play the last seconds again (again while it plays: stop)
+recallcraft --stop-replay        stop the replay playing
 recallcraft --pause <minutes>    stop recording for a while (0: until --resume)
 recallcraft --resume | --quit
 recallcraft service install|uninstall|status

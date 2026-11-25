@@ -24,8 +24,15 @@
   window's settings read; they answer with commands handed to the service.
 - The computer's sound is a speaker's loopback, as ScreenGrabCraft records it: the default
   speaker, or during a call the one the call plays on. RecallCraft's own playback is in it, so the
-  service notes when it plays (the window tells it every two seconds while it plays) and the
-  hearer leaves those stretches out of the transcript.
+  service notes when it plays (the window tells it every two seconds while it plays, and when it
+  stops), and the recorder writes the computer's sound as silence in those stretches: a replay
+  recorded would be in the next replay, round and round. (Its loudness is still measured first,
+  so the microphone's echo of it is told apart.) The hearer leaves those stretches out too.
+- Replays (the shortcut, the tray, `--replay`) play the last seconds up to the moment they were
+  asked for and stop. The service writes the replay going on to `%TEMP%\RecallCraft\replay.json`;
+  the replay bar (`recallcraft --replay-bar`, a program of its own like the notice) shows its
+  progress with a Stop, which hands `--stop-replay` to the service. The window's playback, too,
+  never plays past the moment Play was pressed.
 
 ## The recording (`crates/store/src/ring.rs`)
 
@@ -82,4 +89,5 @@ new one past 0.05.
 
 A feeder thread reads 100 ms ahead from the recording, mixes the two sides, time-stretches by WSOLA
 (32 ms slices, matched within 8 ms) so speed keeps pitch, and queues it for the speaker. Live, it
-never passes what's been written; at speed, it drops to 1× once it has caught up.
+never passes what's been written; at speed, it drops to 1× once it has caught up. It's always
+given an end (the window's and the replays' the moment they were asked for), so it stops.

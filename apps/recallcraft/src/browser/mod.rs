@@ -11,6 +11,7 @@ mod call_view;
 mod everything;
 mod export_dialog;
 pub mod notice;
+pub mod replay_bar;
 mod settings_page;
 mod style;
 
@@ -94,13 +95,17 @@ pub enum Page {
 #[allow(clippy::large_enum_variant)]
 #[derive(Clone, Debug, PartialEq)]
 pub enum Action {
-    /// Play from a moment (ms), until `end` if given; `live` follows the recording.
+    /// Play from a moment (ms), until `end`, or else until the moment Play was pressed (it never
+    /// plays on into what's recorded while it plays: what it plays isn't recorded); `live`: the
+    /// recording is still being made, so it waits for what isn't written yet.
     Play {
         at_ms: u64,
         end_ms: Option<u64>,
         live: bool,
     },
     Toggle,
+    /// Stop playing (the next Play starts again).
+    Stop,
     Seek(u64),
     Speed(f32),
     Mix(Mix),
@@ -213,11 +218,19 @@ impl Browser {
         }
     }
 
-    /// While it plays, the service hears so every two seconds: what's played is in the computer's
-    /// sound, and isn't written down as the others'.
+    /// While it plays, the service hears so every two seconds, and once more when it stops: what's
+    /// played is in the computer's sound, so it isn't recorded or written down as the others'.
     fn tell_playing(&mut self) {
         let playing = self.player.as_ref().is_some_and(Player::is_playing);
-        if !playing || self.told_playing.is_some_and(|t| t.elapsed() < Duration::from_secs(2)) {
+        if !playing {
+            if self.told_playing.take().is_some() {
+                std::thread::spawn(|| {
+                    instance::tell("service", &["--own-sound-stopped".to_string()]);
+                });
+            }
+            return;
+        }
+        if self.told_playing.is_some_and(|t| t.elapsed() < Duration::from_secs(2)) {
             return;
         }
         self.told_playing = Some(Instant::now());
@@ -402,10 +415,14 @@ impl Browser {
     fn act(&mut self, a: Action) {
         match a {
             Action::Play { at_ms, end_ms, live } => {
+                let end_ms = end_ms.unwrap_or_else(time::now_ms);
                 if let Some(p) = self.player() {
                     p.set_live(live);
-                    p.play_from(at_ms * 1000, end_ms.map(|e| e * 1000));
+                    p.play_from(at_ms * 1000, Some(end_ms * 1000));
                 }
+            }
+            Action::Stop => {
+                self.player = None;
             }
             Action::Toggle => {
                 if let Some(p) = self.player() {

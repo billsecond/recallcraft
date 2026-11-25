@@ -4,7 +4,9 @@
 //! ```text
 //! recallcraft                      start the service (and open the window), or open the window
 //!                                  of the one running
-//! recallcraft --replay             play the last seconds again (what the shortcut does)
+//! recallcraft --replay             play the last seconds again (what the shortcut does); while
+//!                                  one plays, stop it
+//! recallcraft --stop-replay        stop the replay playing
 //! recallcraft --pause <minutes>    stop recording for a while (0: until --resume)
 //! recallcraft --resume             record again
 //! recallcraft --settings           open the window at its settings
@@ -25,6 +27,7 @@
 mod browser;
 mod graphics;
 mod hotkeys;
+mod replay;
 mod service;
 mod update;
 
@@ -32,7 +35,7 @@ use std::process::ExitCode;
 
 use recallcraft_desktop::{logging, service as signin, version};
 
-const USAGE: &str = "usage: recallcraft [--replay] [--pause <minutes>] [--resume] [--settings] [--quit]
+const USAGE: &str = "usage: recallcraft [--replay] [--stop-replay] [--pause <minutes>] [--resume] [--settings] [--quit]
        recallcraft --check-updates | --install-update
        recallcraft --background | --tray
        recallcraft service install|uninstall|status
@@ -99,6 +102,9 @@ fn main() -> ExitCode {
     }
     if args.iter().any(|a| a == "--notice") {
         return browser::notice::run();
+    }
+    if args.iter().any(|a| a == "--replay-bar") {
+        return browser::replay_bar::run();
     }
     service::run(&args)
 }
